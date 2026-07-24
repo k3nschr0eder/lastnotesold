@@ -1,18 +1,19 @@
 /**
  * LastNoteSold API — Server Functions
  * 
- * Runs all data sources independently and returns tabbed results.
- *   - Sold-Comps (real eBay sold prices)
+ * Runs data sources independently and returns tabbed results.
  *   - eBay Browse API (active listing asking prices)
  *   - Greysheet/CPG Public API v2 (wholesale dealer pricing)
  *   - Neon database (curated seed data — fallback)
+ * 
+ * Note: Sold-Comps (real eBay sold prices) is fetched client-side
+ * by the browser for Premier users, since the server can't reach their API.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { dbQuery, dbExec } from "~/lib/db-tool";
 import { computePricing } from "~/lib/pricing-engine";
 import { searchEbayCompleted, extractGrade as extractEbayGrade, filterEbayResults } from "~/lib/ebay-api";
 import { searchGreysheet, hasCredentials as hasGreysheetCreds, findCategoryNodeId, getCollectiblesByCategory } from "~/lib/greysheet-api";
-import { searchSoldComps, hasCredentials as hasSoldCompsCreds } from "~/lib/soldcomps-api";
 import { getTierConfig } from "~/lib/tiers";
 import type { PriceResult, SaleRecord } from "~/lib/pricing-engine";
 
@@ -76,44 +77,25 @@ export const lookupNote = createServerFn({ method: "POST" })
       fingerprint: clientIp || "anon",
     });
 
-    console.log(`[lookupNote] Tier: ${tierConfig.tier}, showSoldComps: ${tierConfig.showSoldComps}, hasSoldCompsCreds: ${hasSoldCompsCreds()}, showGreysheet: ${tierConfig.showGreysheet}, hasGreysheetCreds: ${hasGreysheetCreds()}`);
+    console.log(`[lookupNote] Tier: ${tierConfig.tier}, showGreysheet: ${tierConfig.showGreysheet}, hasGreysheetCreds: ${hasGreysheetCreds()}`);
 
     try {
       // === Fetch data sources based on tier ===
-      // Use allSettled so a slow Sold-Comps API doesn't block other results from rendering.
-      // Each source has its own internal timeout; we add a shorter outer deadline here
-      // so the whole lookup returns fast even if one source is hanging.
-      const withDeadline = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
-        Promise.race([
-          p,
-          new Promise<T>((_, reject) =>
-            setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
-          ),
-        ]);
+      // Sold-Comps is fetched client-side by the browser for Premier users.
 
       const results = await Promise.allSettled([
         searchEbayCompleted(terms),
         tierConfig.showGreysheet && hasGreysheetCreds()
           ? searchGreysheet(terms)
           : Promise.resolve([] as any[]),
-        tierConfig.showSoldComps && hasSoldCompsCreds()
-          ? withDeadline(searchSoldComps(terms, tierConfig.maxComps), 20000, "SoldComps")
-          : Promise.resolve([] as any[]),
       ]);
 
       const ebayItemsRaw = results[0].status === "fulfilled" ? results[0].value : [];
       const greysheetItems = results[1].status === "fulfilled" ? results[1].value : [];
-      const soldCompsItems = results[2].status === "fulfilled" ? results[2].value : [];
-
-      if (results[2].status === "rejected") {
-        console.error(`[lookupNote] SoldComps FAILED: ${results[2].reason}`);
-      } else if (results[2].status === "fulfilled" && soldCompsItems.length === 0) {
-        console.warn("[lookupNote] SoldComps returned 0 items — API may be slow, rate-limited, or no results found");
-      }
 
       // Filter eBay results (remove bulk lots)
       const filteredItems = filterEbayResults(ebayItemsRaw, terms);
-      console.log(`[lookupNote] eBay: ${filteredItems.length}, Greysheet: ${greysheetItems.length}, SoldComps: ${soldCompsItems.length}`);
+      console.log(`[lookupNote] eBay: ${filteredItems.length}, Greysheet: ${greysheetItems.length}`);
 
       // ── Build eBay result ──
       let ebayResult: PriceResult | null = null;
@@ -163,33 +145,7 @@ export const lookupNote = createServerFn({ method: "POST" })
         console.log("[lookupNote] Greysheet returned 0 items — note may not be in CPG catalog");
       }
 
-      // ── Build Sold-Comps result ──
-      let soldCompsResult: PriceResult | null = null;
-      if (soldCompsItems.length > 0) {
-        const sales: SaleRecord[] = soldCompsItems
-          .filter((item) => {
-            const p = typeof item.soldPrice === "string" ? parseFloat(item.soldPrice) : item.soldPrice;
-            return typeof p === "number" && !Number.isNaN(p) && p > 0;
-          })
-          .map((item, i) => ({
-          id: i,
-          note_id: 0,
-          source: "eBay Sold",
-          sale_date: item.endedAt ? item.endedAt.substring(0, 10) : new Date().toISOString().substring(0, 10),
-          price: typeof item.soldPrice === "string" ? parseFloat(item.soldPrice) : item.soldPrice,
-          grade: item.condition || "N/A",
-          auction_house: item.sellerUsername || "eBay Sold",
-          sale_url: item.url,
-        }));
-        soldCompsResult = buildPriceResult(
-          "eBay Sold Listings",
-          "Actual sold prices from recent eBay transactions via Sold-Comps",
-          terms, sales,
-        );
-        console.log(`[lookupNote] SoldComps comps_count: ${soldCompsResult.comps_count}`);
-      } else if (!hasSoldCompsCreds()) {
-        console.log("[lookupNote] SoldComps not configured — skipping");
-      }
+      // ── Sold-Comps: fetched client-side by the browser for Premier users ──
 
       // ── Build Database fallback ──
       let dbResult: PriceResult | null = null;
@@ -239,7 +195,7 @@ export const lookupNote = createServerFn({ method: "POST" })
       return {
         ebay: ebayResult,
         greysheet: greysheetResult,
-        soldcomps: soldCompsResult,
+        soldcomps: null, // fetched client-side by browser for Premier users
         db: dbResult,
         tier: tierConfig.tier,
         freeLookupsRemaining: tierConfig.freeLookupsRemaining,

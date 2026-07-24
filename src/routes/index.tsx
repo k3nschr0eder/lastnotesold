@@ -7,6 +7,7 @@ import TierBadge from "~/components/TierBadge";
 import { lookupNote } from "~/lib/api";
 import type { TabbedLookupResult } from "~/lib/api";
 import type { PriceResult } from "~/lib/pricing-engine";
+import { computePricing } from "~/lib/pricing-engine";
 import type { TierName } from "~/lib/tiers";
 
 export const Route = createFileRoute("/")({
@@ -206,6 +207,41 @@ function Home() {
       const result = await lookupNote({ data: { query, fingerprint: customerId || fingerprint } }) as TabbedLookupResult;
       setSearchResult(result);
       if (result.tier) setTier(result.tier);
+
+      // Premier: fetch Sold-Comps client-side (server can't reach their API)
+      if (result.tier === "premier") {
+        fetch(`https://api.sold-comps.com/v1/scrape?keyword=${encodeURIComponent(query)}&count=20`, {
+          headers: { Authorization: "Bearer sc_faNNcUrMhqwdqTYhLhyZJJfRTuFuWCsRdxsFdpaKCpGVDZfNgNBzRPnTlebALhPC" }
+        })
+        .then(r => r.json())
+        .then(data => {
+          const items = data.items || [];
+          if (items.length === 0) return;
+          const sales = items
+            .filter((item: any) => {
+              const p = parseFloat(item.soldPrice);
+              return !isNaN(p) && p > 0;
+            })
+            .map((item: any) => ({
+              id: 0,
+              note_id: 0,
+              source: "eBay Sold",
+              sale_date: item.endedAt?.substring(0, 10) || new Date().toISOString().substring(0, 10),
+              price: parseFloat(item.soldPrice),
+              grade: item.condition || "N/A",
+              auction_house: item.sellerUsername || "eBay Sold",
+              sale_url: item.url,
+            }));
+          if (sales.length === 0) return;
+          const soldcomps: PriceResult = {
+            ...computePricing(query, sales),
+            source: "eBay Sold Listings",
+            note: "Actual sold prices from recent eBay transactions via Sold-Comps",
+          };
+          setSearchResult((prev: TabbedLookupResult | null) => prev ? { ...prev, soldcomps } : prev);
+        })
+        .catch(err => console.error("SoldComps client fetch failed:", err));
+      }
     } catch (e) {
       console.error("Search failed:", e);
     } finally {
