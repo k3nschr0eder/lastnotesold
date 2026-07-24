@@ -220,7 +220,7 @@ function ReferralsPage() {
               />
 
               {/* Stats Cards */}
-              <div className="grid gap-6 sm:grid-cols-3">
+              <div className="grid gap-6 sm:grid-cols-4">
                 <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 text-center">
                   <p className="text-3xl mb-2">👆</p>
                   <p className="text-3xl font-bold text-white">{stats!.clicks.toLocaleString()}</p>
@@ -235,6 +235,11 @@ function ReferralsPage() {
                   <p className="text-3xl mb-2">💰</p>
                   <p className="text-3xl font-bold text-emerald-400">${stats!.earned.toLocaleString()}</p>
                   <p className="mt-1 text-sm text-gray-400">Total Earned</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-800/30 bg-emerald-950/20 p-6 text-center">
+                  <p className="text-3xl mb-2">📊</p>
+                  <p className="text-3xl font-bold text-emerald-400">{stats!.remainingThisMonth}</p>
+                  <p className="mt-1 text-sm text-gray-400">Remaining This Month</p>
                 </div>
               </div>
             </div>

@@ -69,10 +69,13 @@ async function getTierForCustomer(customerId: string): Promise<TierConfig> {
       console.error("[Tiers] STRIPE_SECRET_KEY is not set — tier detection will fail");
       return { ...FREE_TIER };
     }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(
       `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1`,
-      { headers: { Authorization: "Basic " + btoa(key + ":") } },
+      { headers: { Authorization: "Basic " + btoa(key + ":") }, signal: controller.signal },
     );
+    clearTimeout(timer);
     const data = await res.json();
     const sub = data.data?.[0];
     

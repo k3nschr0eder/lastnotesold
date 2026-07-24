@@ -61,20 +61,22 @@ export async function searchSoldComps(
 ): Promise<SoldCompsItem[]> {
   const token = getApiToken();
   if (!token) {
-    console.log("[SoldComps] SOLDCOMPS_API_TOKEN not configured");
+    console.error("[SoldComps] SOLDCOMPS_API_TOKEN not configured — cannot fetch sold data");
     return [];
   }
+  console.log(`[SoldComps] Starting fetch for "${query}" (token present: ${token.length} chars)`);
 
   const params = new URLSearchParams({
     keyword: query,
     count: String(Math.min(count, 240)),
   });
 
-  // Shorter internal timeout — the caller (api.ts) adds a 12s outer deadline,
-  // so this AbortSignal catches cases where the fetch stalls before the caller's timeout.
+  // Internal timeout — the caller (api.ts) adds a 20s outer deadline via withDeadline,
+  // so this AbortSignal acts as a safety net for stalled connections.
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new Error("SoldComps fetch timed out")), 18000);
+  const timeoutId = setTimeout(() => controller.abort(new Error("SoldComps fetch timed out")), 25000);
 
+  const startTime = Date.now();
   try {
     const resp = await fetch(`${API_BASE}/scrape?${params.toString()}`, {
       method: "GET",
@@ -85,20 +87,22 @@ export async function searchSoldComps(
       signal: controller.signal,
     });
 
+    const elapsed = Date.now() - startTime;
     if (!resp.ok) {
-      console.log(`[SoldComps] HTTP ${resp.status} — token may have expired or be rate-limited`);
+      console.error(`[SoldComps] HTTP ${resp.status} after ${elapsed}ms — token may have expired or be rate-limited`);
       return [];
     }
 
     const data: SoldCompsResponse = await resp.json();
-    console.log(`[SoldComps] Found ${data.items.length} sold listings for "${query}"`);
+    console.log(`[SoldComps] Found ${data.items.length} sold listings for "${query}" in ${elapsed}ms`);
     return data.items;
   } catch (e) {
+    const elapsed = Date.now() - startTime;
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("timed out") || msg.includes("abort") || msg.includes("AbortError")) {
-      console.warn(`[SoldComps] Request timed out for "${query}" — API may be slow to scrape eBay`);
+      console.error(`[SoldComps] Request timed out for "${query}" after ${elapsed}ms — API may be slow or unreachable`);
     } else {
-      console.error(`[SoldComps] Error for "${query}":`, msg);
+      console.error(`[SoldComps] Error for "${query}" after ${elapsed}ms:`, msg);
     }
     return [];
   } finally {

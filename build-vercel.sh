@@ -284,7 +284,9 @@ export default async function handler(req, res) {
       "allow_promotion_codes": "true",
     });
     if (referralCode) {
+      params.delete("allow_promotion_codes");
       params.set("metadata[referral_code]", referralCode);
+      params.set("discounts[0][coupon]", "9HS0tgBV");
     }
 
     const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {

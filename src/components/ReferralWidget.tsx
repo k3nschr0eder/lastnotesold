@@ -87,26 +87,6 @@ export default function ReferralWidget({ code, conversions = 0, earned = 0, comp
           </div>
         </div>
       )}
-      <div className="mt-3 border-t border-gray-800 pt-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">
-            <span className="text-emerald-400 font-semibold">{monthlyConversions}</span>
-            <span> of </span>
-            <span className="font-semibold">{monthlyLimit}</span>
-            <span> referrals used this month</span>
-          </p>
-          <p className="text-xs text-gray-500">
-            <span className="text-emerald-400 font-semibold">{remainingThisMonth}</span>
-            <span> remaining</span>
-          </p>
-        </div>
-        <div className="mt-1.5 h-1.5 w-full rounded-full bg-gray-800">
-          <div
-            className="h-1.5 rounded-full bg-emerald-500 transition-all"
-            style={{ width: `${Math.min(100, (monthlyConversions / monthlyLimit) * 100)}%` }}
-          />
-        </div>
-      </div>
     </div>
   );
 }

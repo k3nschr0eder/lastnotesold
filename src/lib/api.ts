@@ -76,6 +76,8 @@ export const lookupNote = createServerFn({ method: "POST" })
       fingerprint: clientIp || "anon",
     });
 
+    console.log(`[lookupNote] Tier: ${tierConfig.tier}, showSoldComps: ${tierConfig.showSoldComps}, hasSoldCompsCreds: ${hasSoldCompsCreds()}, showGreysheet: ${tierConfig.showGreysheet}, hasGreysheetCreds: ${hasGreysheetCreds()}`);
+
     try {
       // === Fetch data sources based on tier ===
       // Use allSettled so a slow Sold-Comps API doesn't block other results from rendering.
@@ -95,7 +97,7 @@ export const lookupNote = createServerFn({ method: "POST" })
           ? searchGreysheet(terms)
           : Promise.resolve([] as any[]),
         tierConfig.showSoldComps && hasSoldCompsCreds()
-          ? withDeadline(searchSoldComps(terms, tierConfig.maxComps), 12000, "SoldComps")
+          ? withDeadline(searchSoldComps(terms, tierConfig.maxComps), 20000, "SoldComps")
           : Promise.resolve([] as any[]),
       ]);
 
@@ -104,7 +106,9 @@ export const lookupNote = createServerFn({ method: "POST" })
       const soldCompsItems = results[2].status === "fulfilled" ? results[2].value : [];
 
       if (results[2].status === "rejected") {
-        console.warn(`[lookupNote] SoldComps: ${results[2].reason}`);
+        console.error(`[lookupNote] SoldComps FAILED: ${results[2].reason}`);
+      } else if (results[2].status === "fulfilled" && soldCompsItems.length === 0) {
+        console.warn("[lookupNote] SoldComps returned 0 items — API may be slow, rate-limited, or no results found");
       }
 
       // Filter eBay results (remove bulk lots)
