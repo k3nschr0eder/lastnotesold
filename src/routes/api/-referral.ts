@@ -31,14 +31,10 @@ export const getReferral = createServerFn({ method: "GET" })
         };
       }
 
-      // Code generation mode — requires Premier subscription check
-      // For now, we trust the client to pass isPremier=true only for Premier members.
-      // In production, verify via Stripe customer subscription status.
-      const premier = data.customerId ? true : false; // Simplified: any customerId = Premier for MVP
-
-      const result = await getOrCreateReferralCode(customerId, premier);
+      // Code generation mode — works for both Pro and Premier subscribers
+      const result = await getOrCreateReferralCode(customerId);
       if (!result) {
-        return { error: "Referrals are only available for Premier subscribers" };
+        return { error: "Referrals are only available for Pro and Premier subscribers" };
       }
 
       return {

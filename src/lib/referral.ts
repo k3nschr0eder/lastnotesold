@@ -118,16 +118,14 @@ async function runExec(sql: string, params: string[] = []): Promise<boolean> {
 
 /**
  * Get or create a referral code for a Stripe customer.
+ * Works for both Pro and Premier subscribers.
  *
  * @param customerId — Stripe customer ID (e.g. "cus_xxx")
- * @param premier    — whether the customer is on Premier tier (always true for MVP)
  * @returns { code, link } or null if referrals aren't available
  */
 export async function getOrCreateReferralCode(
-  customerId: string,
-  premier: boolean = true
+  customerId: string
 ): Promise<{ code: string; link: string } | null> {
-  if (!premier) return null;
   if (!getTursoConfig()) return null;
 
   // Check if customer already has a code
