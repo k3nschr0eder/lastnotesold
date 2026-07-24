@@ -155,7 +155,7 @@ function ReferralsPage() {
       .finally(() => setLoading(false));
   }, [customerId]);
 
-  const isPremier = stats !== null && !error;
+  const isSubscriber = stats !== null && !error;
   const isLoggedIn = !!customerId;
 
   return (
@@ -166,7 +166,7 @@ function ReferralsPage() {
             Referrals
           </h1>
           <p className="mt-4 text-lg text-gray-400">
-            Share LastNoteSold and earn $5 for every subscriber you refer.
+            Share LastNoteSold and earn $2 for Pro referrals and $5 for Premier referrals.
           </p>
         </div>
       </section>
@@ -192,7 +192,7 @@ function ReferralsPage() {
               </li>
               <li className="flex gap-3">
                 <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-900/50 text-xs font-bold text-emerald-400">2</span>
-                <span>When they click your link and sign up for any paid plan, you earn a $5 bounty.</span>
+                <span>When they click your link and sign up for any paid plan, you earn a bounty — $2 for Pro, $5 for Premier.</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-900/50 text-xs font-bold text-emerald-400">3</span>
@@ -201,8 +201,8 @@ function ReferralsPage() {
             </ol>
           </div>
 
-          {/* Premier with stats */}
-          {!loading && isPremier && (
+          {/* Subscriber with stats */}
+          {!loading && isSubscriber && (
             <div className="space-y-8">
               <ReferralWidget
                 code={stats!.code}
@@ -246,7 +246,7 @@ function ReferralsPage() {
               <p className="text-4xl mb-4">🔑</p>
               <h2 className="text-xl font-bold text-white mb-2">Sign in to see your referrals</h2>
               <p className="text-gray-400 mb-6">
-                Already a Premier subscriber? Sign in with your checkout email on the home page to view your referral stats.
+                Already a Pro or Premier subscriber? Sign in with your checkout email on the home page to view your referral stats.
               </p>
               <a
                 href="/"
@@ -257,14 +257,14 @@ function ReferralsPage() {
             </div>
           )}
 
-          {/* Logged in but not Premier (or API error) */}
-          {!loading && isLoggedIn && !isPremier && (
+          {/* Logged in but not subscribed (or API error) */}
+          {!loading && isLoggedIn && !isSubscriber && (
             <div className="rounded-2xl border border-emerald-800/30 bg-gray-900/60 p-12 text-center mb-8">
               <p className="text-4xl mb-4">⭐</p>
-              <h2 className="text-xl font-bold text-white mb-2">Premier Plan Required</h2>
+              <h2 className="text-xl font-bold text-white mb-2">Pro or Premier Plan Required</h2>
               <p className="text-gray-400 mb-6">
-                The referral program is exclusive to Premier subscribers ($24.99/month).
-                Upgrade to start earning $5 for every person you refer.
+                The referral program is available for Pro ($14.99/month) and Premier ($24.99/month) subscribers.
+                Upgrade to start earning $2 (Pro) or $5 (Premier) for every person you refer.
               </p>
               <a
                 href="/pricing"

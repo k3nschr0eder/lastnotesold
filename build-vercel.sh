@@ -131,7 +131,7 @@ export default async function handler(req, res) {
         fetch(`${base}/api/referral-conversion`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ code: referralCode, bountyAmountCents: 500 }),
+          body: JSON.stringify({ code: referralCode, bountyAmountCents: tier === "premier" ? 500 : 200 }),
         }).catch(e => console.error("[Webhook] Referral conversion error:", e));
       }
     } else if (event.type === "customer.subscription.deleted") {
