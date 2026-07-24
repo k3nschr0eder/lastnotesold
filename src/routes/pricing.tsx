@@ -163,7 +163,19 @@ function PricingPage() {
                     </li>
                   ))}
                 </ul>
-                {tier.tier ? (
+                {tier.name === "Premier" ? (
+                  <>
+                    <button
+                      disabled
+                      className="mt-8 flex w-full items-center justify-center rounded-xl bg-gray-800 py-3 text-sm font-bold text-gray-500 cursor-not-allowed border border-gray-700"
+                    >
+                      Temporarily Unavailable
+                    </button>
+                    <p className="mt-2 text-center text-xs text-gray-500">
+                      Sold Comps data is currently unavailable. Premier will be available once resolved.
+                    </p>
+                  </>
+                ) : tier.tier ? (
                   <button
                     onClick={() => handleSubscribe(tier.tier!)}
                     disabled={loading}

@@ -389,16 +389,30 @@ function Home() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  to="/pricing"
-                  className={`mt-8 flex w-full items-center justify-center rounded-xl py-3 text-sm font-bold transition-all ${
-                    tier.featured
-                      ? "bg-emerald-500 text-gray-950 hover:bg-emerald-400"
-                      : "border border-gray-700 text-gray-200 hover:border-emerald-500 hover:text-emerald-400"
-                  }`}
-                >
-                  {tier.cta}
-                </Link>
+                {tier.name === "Premier" ? (
+                  <>
+                    <button
+                      disabled
+                      className="mt-8 flex w-full items-center justify-center rounded-xl bg-gray-800 py-3 text-sm font-bold text-gray-500 cursor-not-allowed border border-gray-700"
+                    >
+                      Temporarily Unavailable
+                    </button>
+                    <p className="mt-2 text-center text-xs text-gray-500">
+                      Sold Comps data is currently unavailable. Premier will be available once resolved.
+                    </p>
+                  </>
+                ) : (
+                  <Link
+                    to="/pricing"
+                    className={`mt-8 flex w-full items-center justify-center rounded-xl py-3 text-sm font-bold transition-all ${
+                      tier.featured
+                        ? "bg-emerald-500 text-gray-950 hover:bg-emerald-400"
+                        : "border border-gray-700 text-gray-200 hover:border-emerald-500 hover:text-emerald-400"
+                    }`}
+                  >
+                    {tier.cta}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
