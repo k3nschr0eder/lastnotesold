@@ -8,6 +8,7 @@ import SingleSourceResults from "~/components/SingleSourceResults";
 interface TabbedResultsProps {
   result: TabbedLookupResult;
   tier?: TierName;
+  soldCompsLoading?: boolean;
 }
 
 interface SourceTab {
@@ -108,7 +109,7 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
   );
 }
 
-export default function TabbedResults({ result, tier }: TabbedResultsProps) {
+export default function TabbedResults({ result, tier, soldCompsLoading }: TabbedResultsProps) {
   const tabs: SourceTab[] = [
     { id: "ebay", label: "eBay Active", data: result.ebay, icon: "🛒" },
     { id: "greysheet", label: "Greensheet CPG", data: result.greysheet, icon: "🏦" },
@@ -169,6 +170,13 @@ export default function TabbedResults({ result, tier }: TabbedResultsProps) {
       {/* Active source content — null guard: never pass null to SingleSourceResults */}
       {activeSource.data ? (
         <SingleSourceResults result={activeSource.data} />
+      ) : soldCompsLoading && activeTab === "soldcomps" ? (
+        <div className="mx-auto w-full max-w-4xl animate-fade-in text-center">
+          <div className="rounded-2xl border border-green-900/30 bg-gray-900/60 p-12">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-green-500 border-t-transparent" />
+            <p className="text-green-400 text-sm">Loading Sold Comps data...</p>
+          </div>
+        </div>
       ) : (
         <PlaceholderCard tabId={activeSource.id} tier={tier} />
       )}

@@ -6,13 +6,14 @@ import SingleSourceResults from "~/components/SingleSourceResults";
 
 interface PricingResultsProps {
   result: PriceResult | TabbedLookupResult | null;
+  soldCompsLoading?: boolean;
 }
 
 function isTabbedResult(r: PriceResult | TabbedLookupResult): r is TabbedLookupResult {
   return "ebay" in r || "greysheet" in r || "db" in r;
 }
 
-export default function PricingResults({ result }: PricingResultsProps) {
+export default function PricingResults({ result, soldCompsLoading }: PricingResultsProps) {
   if (!result) return null;
 
   let tierBanner = null;
@@ -39,7 +40,7 @@ export default function PricingResults({ result }: PricingResultsProps) {
     return (
       <>
         {tierBanner}
-        <TabbedResults result={result} tier={result.tier} />
+        <TabbedResults result={result} tier={result.tier} soldCompsLoading={soldCompsLoading} />
       </>
     );
   }

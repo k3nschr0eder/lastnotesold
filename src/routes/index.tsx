@@ -4,7 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import PricingSearch from "~/components/PricingSearch";
 import PricingResults from "~/components/PricingResults";
 import TierBadge from "~/components/TierBadge";
-import { lookupNote } from "~/lib/api";
+import { lookupNote, lookupSoldComps } from "~/lib/api";
 import type { TabbedLookupResult } from "~/lib/api";
 import type { PriceResult } from "~/lib/pricing-engine";
 import type { TierName } from "~/lib/tiers";
@@ -98,6 +98,7 @@ const tiers = [
 function Home() {
   const [searchResult, setSearchResult] = useState<TabbedLookupResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [soldCompsLoading, setSoldCompsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(
     () => (typeof document !== "undefined" ? document.cookie.split("; ").find(r => r.startsWith("cus_id="))?.split("=")[1] || null : null)
@@ -200,12 +201,31 @@ function Home() {
 
   const handleSearch = async (query: string) => {
     setIsLoading(true);
+    setSoldCompsLoading(false);
     setHasSearched(true);
 
     try {
       const result = await lookupNote({ data: { query, fingerprint: customerId || fingerprint } }) as TabbedLookupResult;
       setSearchResult(result);
       if (result.tier) setTier(result.tier);
+
+      // If Premier tier, fire Sold-Comps in background after initial results are shown
+      if (result.tier === "premier" && !result.soldcomps && query) {
+        setSoldCompsLoading(true);
+        const fp = customerId || fingerprint;
+        lookupSoldComps({ data: { query, fingerprint: fp } })
+          .then((soldCompsResult) => {
+            setSearchResult(prev => {
+              if (!prev) return prev;
+              return { ...prev, soldcomps: soldCompsResult };
+            });
+            setSoldCompsLoading(false);
+          })
+          .catch((err) => {
+            console.error("SoldComps background fetch failed:", err);
+            setSoldCompsLoading(false);
+          });
+      }
     } catch (e) {
       console.error("Search failed:", e);
     } finally {
@@ -310,7 +330,7 @@ function Home() {
                   </span>
                 )}
               </div>
-              <PricingResults result={searchResult} />
+              <PricingResults result={searchResult} soldCompsLoading={soldCompsLoading} />
             </>
           ) : (
             <div className="flex flex-col items-center gap-4 py-12 text-center">
