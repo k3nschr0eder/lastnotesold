@@ -124,6 +124,16 @@ export default async function handler(req, res) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ customerId: sub.customer, status: sub.status, tier, periodEnd }),
       });
+
+      // Record referral conversion if subscription has referral_code metadata
+      const referralCode = sub.metadata?.referral_code;
+      if (referralCode && event.type === "customer.subscription.created") {
+        fetch(`${base}/api/referral-conversion`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ code: referralCode, bountyAmountCents: 500 }),
+        }).catch(e => console.error("[Webhook] Referral conversion error:", e));
+      }
     } else if (event.type === "customer.subscription.deleted") {
       const sub = event.data.object;
       const base = `https://${req.headers.host}`;
@@ -257,7 +267,7 @@ export default async function handler(req, res) {
       req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
       req.on("error", reject);
     });
-    const { tier } = JSON.parse(body || "{}");
+    const { tier, referralCode } = JSON.parse(body || "{}");
     const priceId = tier === "premier"
       ? "price_1TwOtyExpuSFJTtEmSxDgmmp"
       : "price_1TwOtrExpuSFJTtEH7NTOh0O";
@@ -265,20 +275,25 @@ export default async function handler(req, res) {
     const proto = req.headers["x-forwarded-proto"] || "https";
     const key = process.env.STRIPE_SECRET_KEY || "";
 
+    const params = new URLSearchParams({
+      "mode": "subscription",
+      "line_items[0][price]": priceId,
+      "line_items[0][quantity]": "1",
+      "success_url": `${proto}://${host}/?subscribed=true`,
+      "cancel_url": `${proto}://${host}/pricing`,
+      "allow_promotion_codes": "true",
+    });
+    if (referralCode) {
+      params.set("metadata[referral_code]", referralCode);
+    }
+
     const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
       headers: {
         "Authorization": "Basic " + Buffer.from(key + ":").toString("base64"),
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        "mode": "subscription",
-        "line_items[0][price]": priceId,
-        "line_items[0][quantity]": "1",
-        "success_url": `${proto}://${host}/?subscribed=true`,
-        "cancel_url": `${proto}://${host}/pricing`,
-        "allow_promotion_codes": "true",
-      }).toString(),
+      body: params.toString(),
     });
 
     const session = await stripeRes.json();

@@ -45,7 +45,7 @@ const tiers = [
       "Unlimited lookups",
       "eBay Active listings (20 comps)",
       "Full Greensheet CPG data",
-      "Sold Comps — real sold prices (20 comps)",
+      "Sold Comps — real sold prices (20 comps) - COMING SOON",
       "All three data sources",
       "Priority support",
     ],
@@ -84,10 +84,13 @@ function PricingPage() {
   const handleSubscribe = async (tier: string) => {
     setLoading(true);
     try {
+      const refCookie = document.cookie.split("; ").find(r => r.startsWith("ref="))?.split("=")[1];
+      const body: Record<string, string> = { tier };
+      if (refCookie) body.referralCode = decodeURIComponent(refCookie);
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;

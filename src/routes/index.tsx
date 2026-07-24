@@ -86,7 +86,7 @@ const tiers = [
     description: "All three data sources — real sold prices.",
     features: [
       "Unlimited lookups",
-      "eBay Active + Greensheet + Sold Comps (20 each)",
+      "eBay Active + Greensheet + Sold Comps (20 each) - COMING SOON",
       "Real eBay sold prices",
       "Priority support",
     ],
@@ -123,6 +123,13 @@ function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
+    const refCode = params.get("ref");
+    
+    // Store referral code in cookie for 30 days
+    if (refCode) {
+      document.cookie = `ref=${encodeURIComponent(refCode)}; path=/; max-age=2592000; SameSite=Lax`;
+    }
+    
     if (sessionId && params.get("subscribed") === "true") {
       fetch(`/api/session?session_id=${sessionId}`)
         .then(r => r.json())
