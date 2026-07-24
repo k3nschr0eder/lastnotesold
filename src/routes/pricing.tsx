@@ -45,7 +45,7 @@ const tiers = [
       "Unlimited lookups",
       "eBay Active listings (20 comps)",
       "Full Greensheet CPG data",
-      "Sold Comps — real sold prices (20 comps) - COMING SOON",
+      "Sold Comps — real sold prices (20 comps)",
       "All three data sources",
       "Priority support",
     ],
@@ -164,17 +164,13 @@ function PricingPage() {
                   ))}
                 </ul>
                 {tier.name === "Premier" ? (
-                  <>
-                    <button
-                      disabled
-                      className="mt-8 flex w-full items-center justify-center rounded-xl bg-gray-800 py-3 text-sm font-bold text-gray-500 cursor-not-allowed border border-gray-700"
-                    >
-                      Temporarily Unavailable
-                    </button>
-                    <p className="mt-2 text-center text-xs text-gray-500">
-                      Sold Comps data is currently unavailable. Premier will be available once resolved.
-                    </p>
-                  </>
+                  <button
+                    onClick={() => handleSubscribe("premier")}
+                    disabled={loading}
+                    className="mt-8 flex w-full items-center justify-center rounded-xl border border-emerald-500 py-3 text-sm font-bold text-emerald-400 transition-all hover:bg-emerald-500 hover:text-gray-950 disabled:opacity-60"
+                  >
+                    {loading ? "Redirecting..." : "Subscribe"}
+                  </button>
                 ) : tier.tier ? (
                   <button
                     onClick={() => handleSubscribe(tier.tier!)}

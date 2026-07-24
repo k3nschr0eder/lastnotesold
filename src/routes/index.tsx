@@ -86,7 +86,7 @@ const tiers = [
     description: "All three data sources — real sold prices.",
     features: [
       "Unlimited lookups",
-      "eBay Active + Greensheet + Sold Comps (20 each) - COMING SOON",
+      "eBay Active + Greensheet + Sold Comps (20 each)",
       "Real eBay sold prices",
       "Priority support",
     ],
@@ -118,6 +118,27 @@ function Home() {
   const [subEmail, setSubEmail] = useState("");
   const [subLoading, setSubLoading] = useState(false);
   const [tier, setTier] = useState<TierName>("free");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const handleSubscribe = async (tierName: string) => {
+    setCheckoutLoading(true);
+    try {
+      const refCode = document.cookie.split("; ").find(r => r.startsWith("ref="))?.split("=")[1];
+      const body: Record<string, string> = { tier: tierName };
+      if (refCode) body.referralCode = decodeURIComponent(refCode);
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (e) {
+      console.error("Checkout failed:", e);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   // Handle return from Stripe checkout
   useEffect(() => {
@@ -390,25 +411,25 @@ function Home() {
                   ))}
                 </ul>
                 {tier.name === "Premier" ? (
-                  <>
-                    <button
-                      disabled
-                      className="mt-8 flex w-full items-center justify-center rounded-xl bg-gray-800 py-3 text-sm font-bold text-gray-500 cursor-not-allowed border border-gray-700"
-                    >
-                      Temporarily Unavailable
-                    </button>
-                    <p className="mt-2 text-center text-xs text-gray-500">
-                      Sold Comps data is currently unavailable. Premier will be available once resolved.
-                    </p>
-                  </>
+                  <button
+                    onClick={() => handleSubscribe("premier")}
+                    disabled={checkoutLoading}
+                    className="mt-8 flex w-full items-center justify-center rounded-xl border border-emerald-500 py-3 text-sm font-bold text-emerald-400 transition-all hover:bg-emerald-500 hover:text-gray-950 disabled:opacity-60"
+                  >
+                    {checkoutLoading ? "Redirecting..." : "Subscribe"}
+                  </button>
+                ) : tier.name === "Pro" ? (
+                  <button
+                    onClick={() => handleSubscribe("pro")}
+                    disabled={checkoutLoading}
+                    className="mt-8 flex w-full items-center justify-center rounded-xl bg-emerald-500 py-3 text-sm font-bold text-gray-950 hover:bg-emerald-400 transition-all disabled:opacity-60"
+                  >
+                    {checkoutLoading ? "Redirecting..." : "Subscribe"}
+                  </button>
                 ) : (
                   <Link
                     to="/pricing"
-                    className={`mt-8 flex w-full items-center justify-center rounded-xl py-3 text-sm font-bold transition-all ${
-                      tier.featured
-                        ? "bg-emerald-500 text-gray-950 hover:bg-emerald-400"
-                        : "border border-gray-700 text-gray-200 hover:border-emerald-500 hover:text-emerald-400"
-                    }`}
+                    className={`mt-8 flex w-full items-center justify-center rounded-xl py-3 text-sm font-bold transition-all border border-gray-700 text-gray-200 hover:border-emerald-500 hover:text-emerald-400`}
                   >
                     {tier.cta}
                   </Link>
