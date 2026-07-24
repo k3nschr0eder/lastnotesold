@@ -320,4 +320,36 @@ cat > .vercel/output/config.json <<'JSON'
 ] }
 JSON
 
+echo "[4/4] inject runtime env vars into function configs"
+bun --cjs -e '
+  const { readFileSync, existsSync, writeFileSync, readdirSync } = require("fs");
+  const { join } = require("path");
+
+  // Read .env file
+  const envContent = readFileSync(".env", "utf-8");
+  const env = {};
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq > 0) {
+      const key = trimmed.substring(0, eq).trim();
+      const value = trimmed.substring(eq + 1).trim();
+      if (value) env[key] = value;
+    }
+  }
+
+  // Inject into each function'\''s .vc-config.json
+  const functionsDir = ".vercel/output/functions";
+  for (const dir of readdirSync(functionsDir)) {
+    const configPath = join(functionsDir, dir, ".vc-config.json");
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, "utf-8"));
+      config.environment = { ...(config.environment || {}), ...env };
+      writeFileSync(configPath, JSON.stringify(config));
+      console.log("  injected env vars into", configPath);
+    }
+  }
+'
+
 echo "done -> .vercel/output ready for: bunx vercel deploy --prebuilt"

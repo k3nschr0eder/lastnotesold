@@ -65,6 +65,10 @@ async function getTierForCustomer(customerId: string): Promise<TierConfig> {
 
   try {
     const key = process.env.STRIPE_SECRET_KEY || "";
+    if (!key) {
+      console.error("[Tiers] STRIPE_SECRET_KEY is not set — tier detection will fail");
+      return { ...FREE_TIER };
+    }
     const res = await fetch(
       `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1`,
       { headers: { Authorization: "Basic " + btoa(key + ":") } },
