@@ -308,6 +308,153 @@ JSON
 cat > .vercel/output/functions/render.func/.vc-config.json <<'JSON'
 { "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs", "supportsResponseStreaming": true, "maxDuration": 30 }
 JSON
+
+# Create referral API function
+mkdir -p .vercel/output/functions/referral.func
+bun build referral-entry.mjs --target node --outfile .vercel/output/functions/referral.func/index.mjs
+cat > .vercel/output/functions/referral.func/.vc-config.json << 'JSON'
+{ "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
+JSON
+
+# Create redirect handler for short referral codes
+mkdir -p .vercel/output/functions/redirect.func
+cat > .vercel/output/functions/redirect.func/index.mjs << 'REDIRECTEND'
+export default async function handler(req, res) {
+  const url = req.url || "";
+  const params = new URL(url, "http://localhost").searchParams;
+  const code = params.get("code") || "";
+
+  if (!code) {
+    res.statusCode = 302;
+    res.setHeader("location", "/");
+    res.end();
+    return;
+  }
+
+  const TURSO_URL = (process.env.TEAM_DB_URL || "").replace("libsql://", "https://");
+  const TURSO_TOKEN = process.env.TEAM_DB_AUTH_TOKEN || "";
+
+  if (!TURSO_URL || !TURSO_TOKEN) {
+    res.statusCode = 302;
+    res.setHeader("location", "/?ref=" + encodeURIComponent(code));
+    res.end();
+    return;
+  }
+
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(TURSO_URL + "/v2/pipeline", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + TURSO_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: [
+          { type: "execute", stmt: { sql: "SELECT code FROM referrals WHERE code = ?", args: [{ type: "text", value: code }] } },
+          { type: "close" },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    const j = await r.json();
+    const rows = j.results?.[0]?.response?.result?.rows || [];
+
+    if (rows.length > 0) {
+      fetch(TURSO_URL + "/v2/pipeline", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + TURSO_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requests: [
+            { type: "execute", stmt: { sql: "INSERT INTO referral_clicks (code) VALUES (?)", args: [{ type: "text", value: code }] } },
+            { type: "close" },
+          ],
+        }),
+      }).catch(() => {});
+      res.statusCode = 302;
+      res.setHeader("location", "/?ref=" + encodeURIComponent(code));
+      res.end();
+    } else {
+      res.statusCode = 302;
+      res.setHeader("location", "/");
+      res.end();
+    }
+  } catch (e) {
+    res.statusCode = 302;
+    res.setHeader("location", "/?ref=" + encodeURIComponent(code));
+    res.end();
+  }
+}
+REDIRECTEND
+
+cat > .vercel/output/functions/redirect.func/.vc-config.json << 'JSON'
+{ "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
+JSON
+
+# Create chat API function
+mkdir -p .vercel/output/functions/chat.func
+cat > .vercel/output/functions/chat.func/index.mjs << 'CHATEND'
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ error: "Method not allowed" }));
+    return;
+  }
+  try {
+    const body = await new Promise((resolve, reject) => {
+      const chunks = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+      req.on("error", reject);
+    });
+    const { message } = JSON.parse(body || "{}");
+    if (!message) {
+      res.statusCode = 400;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ error: "Missing message" }));
+      return;
+    }
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ reply: "I'm currently offline. Please email support@lastnotesold.com for help." }));
+      return;
+    }
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a helpful support assistant for LastNoteSold, a real-time paper money pricing tool for live streamers on Whatnot, TikTok Live, and eBay Live. LastNoteSold pulls live pricing data from eBay Active listings, Greysheet/CPG dealer pricing, and Sold-Comps. Plans: Free (10 lookups/day, eBay only, 3 comps), Pro ($14.99/mo, + Greysheet CPG, 20 comps), Premier ($24.99/mo, + Sold-Comps, 20 comps). Keep answers concise and friendly." },
+          { role: "user", content: message },
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await openaiRes.json();
+    const reply = data.choices?.[0]?.message?.content || "Sorry, I couldn't process that. Try the FAQ below or email support@lastnotesold.com.";
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ reply }));
+  } catch (e) {
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ reply: "I'm having trouble right now. Check the FAQ below or email support@lastnotesold.com for help." }));
+  }
+}
+CHATEND
+
+cat > .vercel/output/functions/chat.func/.vc-config.json << 'JSON'
+{ "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
+JSON
+
 cat > .vercel/output/config.json <<'JSON'
 { "version": 3, "routes": [
   { "src": "/api/webhook", "dest": "/webhook" },
@@ -315,6 +462,11 @@ cat > .vercel/output/config.json <<'JSON'
   { "src": "/api/session", "dest": "/checkout" },
   { "src": "/api/tier", "dest": "/checkout" },
   { "src": "/api/sync-subscription", "dest": "/webhook" },
+  { "src": "/api/referral", "dest": "/referral" },
+  { "src": "/api/referral-click", "dest": "/referral" },
+  { "src": "/api/referral-conversion", "dest": "/referral" },
+  { "src": "/api/chat", "dest": "/chat" },
+  { "src": "^/(?!referrals$|support$|privacy$|terms-of-service$|pricing$|about$)([A-Za-z0-9][A-Za-z0-9-]{1,18}[A-Za-z0-9])$", "dest": "/redirect?code=$1" },
   { "handle": "filesystem" },
   { "src": "/(.*)", "dest": "/render" }
 ] }
