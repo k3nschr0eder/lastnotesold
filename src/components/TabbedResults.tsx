@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { PriceResult } from "~/lib/pricing-engine";
 import type { TabbedLookupResult } from "~/lib/api";
+import type { TierName } from "~/lib/tiers";
 import SingleSourceResults from "~/components/SingleSourceResults";
 
 interface TabbedResultsProps {
   result: TabbedLookupResult;
+  tier?: TierName;
 }
 
 interface SourceTab {
@@ -26,8 +28,10 @@ function tabColor(id: string, isActive: boolean): string {
 }
 
 /** Placeholder card shown when a data source has null data.
- *  eBay null = no results; Greysheet/SoldComps null = tier-locked upgrade prompt. */
-function PlaceholderCard({ tabId }: { tabId: string }) {
+ *  eBay null = no results.
+ *  Greysheet null = upgrade prompt for free tier, "data unavailable" for pro/premier.
+ *  SoldComps null = upgrade prompt for free/pro, "data unavailable" for premier. */
+function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
   if (tabId === "ebay") {
     return (
       <div className="mx-auto w-full max-w-4xl animate-fade-in text-center">
@@ -39,6 +43,36 @@ function PlaceholderCard({ tabId }: { tabId: string }) {
     );
   }
 
+  // Determine if the user is entitled to this data source
+  let isEntitled = false;
+  if (tabId === "greysheet" && tier && (tier === "pro" || tier === "premier")) {
+    isEntitled = true;
+  }
+  if (tabId === "soldcomps" && tier === "premier") {
+    isEntitled = true;
+  }
+
+  // User has the right tier but data is unavailable (API error, timeout, etc.)
+  if (isEntitled) {
+    const message =
+      tabId === "greysheet"
+        ? "Greensheet CPG data is currently unavailable. This may be a temporary issue — please try again or contact support."
+        : "Sold Comps data is currently unavailable. This may be a temporary issue — please try again or contact support.";
+
+    return (
+      <div className="mx-auto w-full max-w-4xl animate-fade-in text-center">
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-12">
+          <p className="text-4xl mb-4">{tabId === "greysheet" ? "🏦" : "💵"}</p>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {tabId === "greysheet" ? "Greensheet CPG" : "Sold Comps"}
+          </h3>
+          <p className="text-gray-400 text-sm max-w-md mx-auto">{message}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // User doesn't have this tier — show upgrade prompt
   const config =
     tabId === "greysheet"
       ? {
@@ -74,7 +108,7 @@ function PlaceholderCard({ tabId }: { tabId: string }) {
   );
 }
 
-export default function TabbedResults({ result }: TabbedResultsProps) {
+export default function TabbedResults({ result, tier }: TabbedResultsProps) {
   const tabs: SourceTab[] = [
     { id: "ebay", label: "eBay Active", data: result.ebay, icon: "🛒" },
     { id: "greysheet", label: "Greensheet CPG", data: result.greysheet, icon: "🏦" },
@@ -136,7 +170,7 @@ export default function TabbedResults({ result }: TabbedResultsProps) {
       {activeSource.data ? (
         <SingleSourceResults result={activeSource.data} />
       ) : (
-        <PlaceholderCard tabId={activeSource.id} />
+        <PlaceholderCard tabId={activeSource.id} tier={tier} />
       )}
     </div>
   );

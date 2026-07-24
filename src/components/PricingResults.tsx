@@ -39,7 +39,7 @@ export default function PricingResults({ result }: PricingResultsProps) {
     return (
       <>
         {tierBanner}
-        <TabbedResults result={result} />
+        <TabbedResults result={result} tier={result.tier} />
       </>
     );
   }
