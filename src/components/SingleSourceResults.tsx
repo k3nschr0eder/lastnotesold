@@ -131,7 +131,7 @@ export default function SingleSourceResults({ result }: SingleSourceResultsProps
 
       {/* ── Greensheet: just the three grade-tier averages (no headline price) ── */}
       {hasData && isGreensheet && (
-        <div className="mb-8 grid gap-6 sm:grid-cols-3">
+        <div className="mb-8 grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-3">
           <div className="rounded-xl border border-gray-800 bg-gray-900/80 p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Low Grade Avg</p>
             <p className="mt-1 text-2xl font-bold text-gray-200">
@@ -159,12 +159,12 @@ export default function SingleSourceResults({ result }: SingleSourceResultsProps
       {/* ── eBay / Historical: Big Price Card with headline ── */}
       {!isGreensheet && (
         <div className="mb-8 overflow-hidden rounded-2xl border border-emerald-800/30 bg-gradient-to-br from-gray-900 via-gray-900 to-emerald-950/30 shadow-2xl shadow-emerald-900/20">
-          <div className="grid gap-6 p-8 sm:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 p-4 sm:p-8 grid-cols-1 sm:grid-cols-3">
             <div className="text-center sm:col-span-3">
               <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-gray-500">
                 {headlineLabel}
               </p>
-              <p className="text-5xl font-extrabold tracking-tight text-emerald-400 sm:text-6xl">
+              <p className="text-4xl font-extrabold tracking-tight text-emerald-400 sm:text-6xl">
                 {hasData ? `$${result.avg_price.toLocaleString()}` : "\u2014"}
               </p>
               {hasData && (

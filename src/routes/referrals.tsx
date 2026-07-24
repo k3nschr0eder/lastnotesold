@@ -159,19 +159,19 @@ function ReferralsPage() {
   const isLoggedIn = !!customerId;
 
   return (
-    <div className="pt-24">
-      <section className="border-b border-emerald-900/20 bg-gray-900/30 py-16">
+    <div className="pt-16 sm:pt-20">
+      <section className="border-b border-emerald-900/20 bg-gray-900/30 py-12 sm:py-16">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-extrabold text-white sm:text-5xl">
+          <h1 className="text-3xl font-extrabold text-white sm:text-5xl">
             Referrals
           </h1>
-          <p className="mt-4 text-lg text-gray-400">
+          <p className="mt-4 text-base text-gray-400 sm:text-lg">
             Share LastNoteSold and earn $2 for Pro referrals and $5 for Premier referrals.
           </p>
         </div>
       </section>
 
-      <section className="py-20">
+      <section className="py-12 sm:py-20">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
 
           {/* Loading */}
@@ -183,7 +183,7 @@ function ReferralsPage() {
           )}
 
           {/* How it works — always shown */}
-          <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-8 mb-8">
+          <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-5 sm:p-8 mb-8">
             <h2 className="text-lg font-bold text-white mb-4">How It Works</h2>
             <ol className="space-y-3 text-sm text-gray-400">
               <li className="flex gap-3">
@@ -220,26 +220,26 @@ function ReferralsPage() {
               />
 
               {/* Stats Cards */}
-              <div className="grid gap-6 sm:grid-cols-4">
-                <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 text-center">
-                  <p className="text-3xl mb-2">👆</p>
-                  <p className="text-3xl font-bold text-white">{stats!.clicks.toLocaleString()}</p>
-                  <p className="mt-1 text-sm text-gray-400">Total Clicks</p>
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+                <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-4 sm:p-6 text-center">
+                  <p className="text-2xl sm:text-3xl mb-2">👆</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white">{stats!.clicks.toLocaleString()}</p>
+                  <p className="mt-1 text-xs sm:text-sm text-gray-400">Total Clicks</p>
                 </div>
-                <div className="rounded-2xl border border-green-900/50 bg-green-950/20 p-6 text-center">
-                  <p className="text-3xl mb-2">✅</p>
-                  <p className="text-3xl font-bold text-green-400">{stats!.conversions.toLocaleString()}</p>
-                  <p className="mt-1 text-sm text-gray-400">Conversions</p>
+                <div className="rounded-2xl border border-green-900/50 bg-green-950/20 p-4 sm:p-6 text-center">
+                  <p className="text-2xl sm:text-3xl mb-2">✅</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-green-400">{stats!.conversions.toLocaleString()}</p>
+                  <p className="mt-1 text-xs sm:text-sm text-gray-400">Conversions</p>
                 </div>
-                <div className="rounded-2xl border border-emerald-800/30 bg-emerald-950/20 p-6 text-center">
-                  <p className="text-3xl mb-2">💰</p>
-                  <p className="text-3xl font-bold text-emerald-400">${stats!.earned.toLocaleString()}</p>
-                  <p className="mt-1 text-sm text-gray-400">Total Earned</p>
+                <div className="rounded-2xl border border-emerald-800/30 bg-emerald-950/20 p-4 sm:p-6 text-center">
+                  <p className="text-2xl sm:text-3xl mb-2">💰</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-400">${stats!.earned.toLocaleString()}</p>
+                  <p className="mt-1 text-xs sm:text-sm text-gray-400">Total Earned</p>
                 </div>
-                <div className="rounded-2xl border border-emerald-800/30 bg-emerald-950/20 p-6 text-center">
-                  <p className="text-3xl mb-2">📊</p>
-                  <p className="text-3xl font-bold text-emerald-400">{stats!.remainingThisMonth}</p>
-                  <p className="mt-1 text-sm text-gray-400">Remaining This Month</p>
+                <div className="rounded-2xl border border-emerald-800/30 bg-emerald-950/20 p-4 sm:p-6 text-center">
+                  <p className="text-2xl sm:text-3xl mb-2">📊</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-400">{stats!.remainingThisMonth}</p>
+                  <p className="mt-1 text-xs sm:text-sm text-gray-400">Remaining This Month</p>
                 </div>
               </div>
             </div>
@@ -247,7 +247,7 @@ function ReferralsPage() {
 
           {/* Not logged in — show program info + CTA */}
           {!loading && !isLoggedIn && (
-            <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-12 text-center mb-8">
+            <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-8 sm:p-12 text-center mb-8">
               <p className="text-4xl mb-4">🔑</p>
               <h2 className="text-xl font-bold text-white mb-2">Sign in to see your referrals</h2>
               <p className="text-gray-400 mb-6">
@@ -264,7 +264,7 @@ function ReferralsPage() {
 
           {/* Logged in but not subscribed (or API error) */}
           {!loading && isLoggedIn && !isSubscriber && (
-            <div className="rounded-2xl border border-emerald-800/30 bg-gray-900/60 p-12 text-center mb-8">
+            <div className="rounded-2xl border border-emerald-800/30 bg-gray-900/60 p-8 sm:p-12 text-center mb-8">
               <p className="text-4xl mb-4">⭐</p>
               <h2 className="text-xl font-bold text-white mb-2">Pro or Premier Plan Required</h2>
               <p className="text-gray-400 mb-6">

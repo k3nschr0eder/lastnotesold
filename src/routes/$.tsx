@@ -6,10 +6,10 @@ export const Route = createFileRoute("/$")({
 
 function NotFoundPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center pt-24">
+    <div className="flex min-h-screen items-center justify-center pt-16 sm:pt-20">
       <div className="mx-auto max-w-md px-4 text-center">
         {/* Glitch-style 404 */}
-        <p className="text-[120px] font-black leading-none text-emerald-600/30 select-none">
+        <p className="text-[80px] sm:text-[120px] font-black leading-none text-emerald-600/30 select-none">
           404
         </p>
 

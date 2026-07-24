@@ -3,9 +3,12 @@
 @layer base {
   html {
     color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-gray-950 text-gray-100 antialiased;
+    overscroll-behavior-y: none;
   }
 }
 

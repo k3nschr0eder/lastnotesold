@@ -102,27 +102,27 @@ function PricingPage() {
   };
 
   return (
-    <div className="pt-24">
+    <div className="pt-16 sm:pt-20">
       {/* Header */}
       <section className="border-b border-emerald-900/20 bg-gray-900/30 py-16">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-extrabold text-white sm:text-5xl">
+          <h1 className="text-3xl font-extrabold text-white sm:text-5xl">
             Pricing
           </h1>
-          <p className="mt-4 text-lg text-gray-400">
+          <p className="mt-4 text-base text-gray-400 sm:text-lg">
             Start free. Upgrade when you need more power.
           </p>
         </div>
       </section>
 
       {/* Tiers */}
-      <section className="py-20">
+      <section className="py-12 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-3">
             {tiers.map((tier) => (
               <div
                 key={tier.name}
-                className={`relative rounded-2xl border p-8 ${
+                className={`relative rounded-2xl border p-5 sm:p-8 ${
                   tier.featured
                     ? "border-emerald-500/50 bg-gradient-to-b from-emerald-950/20 to-gray-900 shadow-xl shadow-emerald-900/20 lg:-mx-4 lg:scale-105"
                     : "border-gray-800 bg-gray-900/60"
@@ -198,7 +198,7 @@ function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-emerald-900/20 bg-gray-900/50 py-20">
+      <section className="border-t border-emerald-900/20 bg-gray-900/50 py-12 sm:py-20">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <h2 className="mb-12 text-center text-3xl font-bold text-white">
             Frequently Asked Questions

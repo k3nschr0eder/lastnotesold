@@ -6,15 +6,15 @@ export const Route = createFileRoute("/privacy")({
 
 function PrivacyPage() {
   return (
-    <div className="pt-24">
-      <section className="border-b border-emerald-900/20 bg-gray-900/30 py-16">
+    <div className="pt-16 sm:pt-20">
+      <section className="border-b border-emerald-900/20 bg-gray-900/30 py-12 sm:py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-extrabold text-white">Privacy Policy</h1>
+          <h1 className="text-3xl font-extrabold text-white sm:text-5xl">Privacy Policy</h1>
           <p className="mt-2 text-sm text-gray-500">Last updated: July 23, 2026</p>
         </div>
       </section>
 
-      <section className="py-16">
+      <section className="py-12 sm:py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="prose prose-invert prose-emerald max-w-none space-y-8 text-gray-300">
             <div>

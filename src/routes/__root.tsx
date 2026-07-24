@@ -8,6 +8,10 @@ export const Route = createRootRoute({
     title: "LastNoteSold — Real-Time Paper Money Pricing for Live Streamers",
     meta: [
       {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1.0, viewport-fit=cover",
+      },
+      {
         name: "description",
         content:
           "Instant paper money pricing from Greensheet CPG and eBay. Built for Whatnot, TikTok Live, and eBay Live streamers.",

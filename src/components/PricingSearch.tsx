@@ -184,7 +184,7 @@ export default function PricingSearch({
             type="button"
             onClick={() => handleSearch(query)}
             disabled={isLoading}
-            className="order-4 sm:order-3 flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-4 text-lg font-bold text-gray-950 shadow-lg shadow-emerald-500/30 transition-all hover:bg-emerald-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="order-4 sm:order-3 flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-4 text-lg font-bold text-gray-950 shadow-lg shadow-emerald-500/30 transition-all hover:bg-emerald-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] sm:min-h-0"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

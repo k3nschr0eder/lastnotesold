@@ -216,7 +216,7 @@ function Home() {
   return (
     <div>
       {/* ───── Hero Section ───── */}
-      <section className="relative flex min-h-[90dvh] flex-col items-center justify-center overflow-hidden px-4 pt-20 pb-16">
+      <section className="relative flex min-h-[90dvh] flex-col items-center justify-center overflow-hidden px-4 pt-16 sm:pt-20 pb-12 sm:pb-16">
         {/* Background gradient */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/40 via-transparent to-transparent" />
 
@@ -232,7 +232,7 @@ function Home() {
           </div>
 
           {/* Headline */}
-          <h1 className="max-w-4xl text-4xl font-extrabold tracking-tight sm:text-6xl lg:text-7xl">
+          <h1 className="max-w-4xl text-3xl font-extrabold tracking-tight sm:text-5xl lg:text-7xl">
             Price notes in seconds.
             <br />
             <span className="bg-gradient-to-r from-emerald-400 to-emerald-200 bg-clip-text text-transparent">
@@ -241,7 +241,7 @@ function Home() {
           </h1>
 
           {/* Subheadline */}
-          <p className="max-w-xl text-lg text-gray-400 sm:text-xl">
+          <p className="max-w-xl text-base text-gray-400 sm:text-xl">
             Real-time pricing from eBay active listings and Greensheet dealer
             data. Built for Whatnot, TikTok Live, and eBay Live streamers who
             can't wait.
@@ -299,7 +299,7 @@ function Home() {
 
       {/* ───── Search Results ───── */}
       {(hasSearched || searchResult) && (
-        <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        <section className="mx-auto max-w-7xl px-4 pb-16 sm:pb-24 sm:px-6 lg:px-8">
           {searchResult && !isLoading ? (
             <>
               <div className="mb-6 flex items-center justify-center gap-3">
@@ -322,19 +322,19 @@ function Home() {
       )}
 
       {/* ───── Features Section ───── */}
-      <section className="border-t border-emerald-900/20 bg-gray-900/50 py-24">
+      <section className="border-t border-emerald-900/20 bg-gray-900/50 py-16 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-16 text-center">
-            <h2 className="text-3xl font-bold text-white sm:text-4xl">
+            <h2 className="text-2xl font-bold text-white sm:text-4xl">
               Everything you need to price on stream
             </h2>
-            <p className="mt-4 text-lg text-gray-400">
+            <p className="mt-4 text-base text-gray-400 sm:text-lg">
               No more frantically switching tabs while the auction clock ticks
               down.
             </p>
           </div>
 
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
               <div
                 key={feature.title}
@@ -354,22 +354,22 @@ function Home() {
       </section>
 
       {/* ───── Pricing Tiers ───── */}
-      <section className="py-24" id="pricing">
+      <section className="py-16 sm:py-24" id="pricing">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-16 text-center">
-            <h2 className="text-3xl font-bold text-white sm:text-4xl">
+            <h2 className="text-2xl font-bold text-white sm:text-4xl">
               Simple, transparent pricing
             </h2>
-            <p className="mt-4 text-lg text-gray-400">
+            <p className="mt-4 text-base text-gray-400 sm:text-lg">
               Start free. Upgrade when you need more.
             </p>
           </div>
 
-          <div className="mx-auto grid max-w-5xl gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mx-auto grid max-w-5xl gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {tiers.map((tier) => (
               <div
                 key={tier.name}
-                className={`relative rounded-2xl border p-8 ${
+                className={`relative rounded-2xl border p-5 sm:p-8 ${
                   tier.featured
                     ? "border-emerald-500/50 bg-gradient-to-b from-emerald-950/20 to-gray-900 shadow-xl shadow-emerald-900/20"
                     : "border-gray-800 bg-gray-900/60"

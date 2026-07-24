@@ -35,9 +35,9 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
   if (tabId === "ebay") {
     return (
       <div className="mx-auto w-full max-w-4xl animate-fade-in text-center">
-        <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-12">
-          <p className="text-4xl mb-4">🔍</p>
-          <p className="text-gray-400">Try a broader search — e.g. just the note name without grade</p>
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 sm:p-12">
+          <p className="text-3xl sm:text-4xl mb-4">🔍</p>
+          <p className="text-gray-400 text-sm">Try a broader search — e.g. just the note name without grade</p>
         </div>
       </div>
     );
@@ -61,9 +61,9 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
 
     return (
       <div className="mx-auto w-full max-w-4xl animate-fade-in text-center">
-        <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-12">
-          <p className="text-4xl mb-4">{tabId === "greysheet" ? "🏦" : "💵"}</p>
-          <h3 className="text-xl font-bold text-white mb-2">
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 sm:p-12">
+          <p className="text-3xl sm:text-4xl mb-4">{tabId === "greysheet" ? "🏦" : "💵"}</p>
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
             {tabId === "greysheet" ? "Greensheet CPG" : "Sold Comps"}
           </h3>
           <p className="text-gray-400 text-sm max-w-md mx-auto">{message}</p>
@@ -90,8 +90,8 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
 
   return (
     <div className="mx-auto w-full max-w-4xl animate-fade-in">
-      <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-12 text-center">
-        <p className="text-4xl mb-4">{config.icon}</p>
+      <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 sm:p-12 text-center">
+      <p className="text-3xl sm:text-4xl mb-4">{config.icon}</p>
         <h3 className="text-xl font-bold text-white mb-2">{config.title}</h3>
         <p className="text-gray-400 text-sm mb-6 max-w-md mx-auto">{config.message}</p>
         <Link
@@ -127,8 +127,8 @@ export default function TabbedResults({ result, tier }: TabbedResultsProps) {
   if (result.error && tabs.every((t) => t.data === null)) {
     return (
       <div className="mx-auto w-full max-w-4xl animate-fade-in text-center">
-        <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-12">
-          <p className="text-4xl mb-4">🔍</p>
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 sm:p-12">
+          <p className="text-3xl sm:text-4xl mb-4">🔍</p>
           <p className="text-red-400 text-sm">{result.error}</p>
         </div>
       </div>
@@ -151,7 +151,7 @@ export default function TabbedResults({ result, tier }: TabbedResultsProps) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 sm:px-4 sm:py-1.5 text-xs font-semibold transition-all duration-200 min-h-[40px] sm:min-h-0 ${
               tabColor(tab.id, activeTab === tab.id)
             } ${activeTab === tab.id ? "shadow-lg" : "opacity-75 hover:opacity-100"}`}
           >

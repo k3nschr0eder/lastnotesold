@@ -158,12 +158,12 @@ function ChatWidget() {
 
 function SupportPage() {
   return (
-    <div className="pt-24">
+    <div className="pt-16 sm:pt-20">
       {/* Hero */}
-      <section className="border-b border-emerald-900/20 bg-gray-900/30 py-16">
+      <section className="border-b border-emerald-900/20 bg-gray-900/30 py-12 sm:py-16">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-extrabold text-white sm:text-5xl">Support</h1>
-          <p className="mt-4 text-lg text-gray-400">
+          <h1 className="text-3xl font-extrabold text-white sm:text-5xl">Support</h1>
+          <p className="mt-4 text-base text-gray-400 sm:text-lg">
             Find answers or ask our AI assistant for help.
           </p>
         </div>

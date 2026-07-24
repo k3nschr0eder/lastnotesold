@@ -55,7 +55,7 @@ export default function ReferralWidget({ code, conversions = 0, earned = 0, comp
 
   return (
     <div className="rounded-xl border border-emerald-800/30 bg-gray-900/60 p-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-lg">🎁</span>
           <div>
@@ -65,7 +65,7 @@ export default function ReferralWidget({ code, conversions = 0, earned = 0, comp
         </div>
         <button
           onClick={handleCopy}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+          className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-all min-h-[44px] flex items-center justify-center ${
             copied
               ? "bg-green-900/50 text-green-400"
               : "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"

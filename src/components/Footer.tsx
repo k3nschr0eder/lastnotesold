@@ -1,8 +1,8 @@
 export default function Footer() {
   return (
     <footer className="border-t border-emerald-900/20 bg-gray-900/50">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:py-12 sm:px-6 lg:px-8">
+        <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2">
@@ -68,7 +68,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 border-t border-emerald-900/20 pt-6 text-center text-xs text-gray-500">
+        <div className="mt-6 sm:mt-10 border-t border-emerald-900/20 pt-6 text-center text-xs text-gray-500">
           &copy; 2026 SixPackSouth, LLC. All rights reserved.
         </div>
       </div>
