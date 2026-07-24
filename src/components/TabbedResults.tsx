@@ -79,7 +79,7 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
           title: "Greensheet CPG",
           icon: "🏦",
           message:
-            "Greensheet CPG data requires a Pro or Premier subscription. Upgrade to see wholesale and retail pricing by grade.",
+            "Greensheet CPG data requires a Pro or Premier subscription. Upgrade to see retail pricing by grade.",
         }
       : {
           title: "Sold Comps",

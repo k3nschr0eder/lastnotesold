@@ -24,7 +24,7 @@ const features = [
     icon: "🏦",
     title: "Greensheet Dealer Pricing",
     description:
-      "Industry-standard CPG retail values by grade. Wholesale and retail pricing for every major US banknote type.",
+      "Industry-standard CPG retail values by grade. Retail pricing for every major US banknote type.",
   },
   {
     icon: "🛒",

@@ -433,7 +433,7 @@ export default async function handler(req, res) {
     if (!apiKey) {
       res.statusCode = 200;
       res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ reply: "I'm currently offline. Please email support@lastnotesold.com for help." }));
+      res.end(JSON.stringify({ reply: "Chat support is coming soon! In the meantime, check our FAQ below or email support@lastnotesold.com." }));
       return;
     }
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -445,7 +445,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are a helpful support assistant for LastNoteSold, a real-time paper money pricing tool for live streamers on Whatnot, TikTok Live, and eBay Live. LastNoteSold pulls live pricing data from eBay Active listings, Greysheet/CPG dealer pricing, and Sold-Comps. Plans: Free (10 lookups/day, eBay only, 3 comps), Pro ($14.99/mo, + Greysheet CPG, 20 comps), Premier ($24.99/mo, + Sold-Comps, 20 comps). Keep answers concise and friendly." },
+          { role: "system", content: "You are a helpful support assistant for LastNoteSold, a real-time paper money pricing tool for live streamers on Whatnot, TikTok Live, and eBay Live. LastNoteSold pulls live pricing data from eBay Active listings, Greensheet/CPG dealer pricing, and Sold-Comps. Plans: Free (10 lookups/day, eBay only, 3 comps), Pro ($14.99/mo, + Greensheet CPG, 20 comps), Premier ($24.99/mo, + Sold-Comps, 20 comps). Keep answers concise and friendly." },
           { role: "user", content: message },
         ],
         max_tokens: 300,

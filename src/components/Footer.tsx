@@ -29,6 +29,12 @@ export default function Footer() {
                 <a href="/pricing" className="transition-colors hover:text-emerald-400">Pricing</a>
               </li>
               <li>
+                <a href="/referrals" className="transition-colors hover:text-emerald-400">Referrals</a>
+              </li>
+              <li>
+                <a href="/support" className="transition-colors hover:text-emerald-400">Support</a>
+              </li>
+              <li>
                 <a href="/about" className="transition-colors hover:text-emerald-400">About</a>
               </li>
             </ul>
@@ -55,12 +61,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-gray-400">
               <li>
                 <span className="transition-colors hover:text-emerald-400 cursor-pointer">
-                  ken@sixpacksouth.com
-                </span>
-              </li>
-              <li>
-                <span className="transition-colors hover:text-emerald-400 cursor-pointer">
-                  @sixpacksouth
+                  support@lastnotesold.com
                 </span>
               </li>
             </ul>
@@ -68,7 +69,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 border-t border-emerald-900/20 pt-6 text-center text-xs text-gray-500">
-          &copy; {new Date().getFullYear()} LastNoteSold. All rights reserved.
+          &copy; 2026 SixPackSouth, LLC. All rights reserved.
         </div>
       </div>
     </footer>

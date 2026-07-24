@@ -7,6 +7,8 @@ const navLinks = [
   { to: "/", label: "Home" },
   { to: "/pricing", label: "Pricing" },
   { to: "/about", label: "About" },
+  { to: "/referrals", label: "Referrals" },
+  { to: "/support", label: "Support" },
 ];
 
 export default function Header() {

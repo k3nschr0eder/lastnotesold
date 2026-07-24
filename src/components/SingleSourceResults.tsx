@@ -27,7 +27,7 @@ function sourceBadgeInfo(result: PriceResult): { label: string; color: string; i
   if (s.includes("sold") || s.includes("sold-comps")) {
     return { label: "eBay Sold Listings", color: "bg-green-900/60 text-green-300 border-green-700/50", icon: "💵" };
   }
-  if (s.includes("greysheet") || s.includes("cpg") || s.includes("wholesale")) {
+  if (s.includes("greysheet") || s.includes("cpg") || s.includes("retail")) {
     return { label: "Greensheet CPG", color: "bg-emerald-900/60 text-emerald-300 border-emerald-700/50", icon: "🏦" };
   }
   if (s.includes("ebay") || s.includes("active listing")) {
@@ -43,7 +43,7 @@ function sourceBadgeInfo(result: PriceResult): { label: string; color: string; i
 function priceHeadline(result: PriceResult, hasData: boolean): string {
   if (!hasData) return "No Comps Found";
   const s = result.source?.toLowerCase() || "";
-  if (s.includes("greysheet") || s.includes("cpg") || s.includes("wholesale")) return "Greensheet CPG";
+  if (s.includes("greysheet") || s.includes("cpg") || s.includes("retail")) return "Greensheet CPG";
   if (s.includes("sold") || s.includes("sold-comps")) return "Avg. Sold Price (eBay Listings)";
   if (s.includes("ebay") || s.includes("active")) return "Avg. Asking Price (Active Listings)";
   if (s.includes("historical") || s.includes("auction") || s.includes("database")) return "Average Last Sold Price";
@@ -51,7 +51,7 @@ function priceHeadline(result: PriceResult, hasData: boolean): string {
 }
 
 /** Build a normalized grade→retail map from sales.
- *  Uses CPG retail prices when available, falls back to Greensheet wholesale prices. */
+ *  Uses CPG retail prices when available, falls back to Greensheet retail prices. */
 function buildGradeRetailMap(sales: PriceResult["recent_sales"]): Map<string, number> {
   const map = new Map<string, number>();
   // First pass: collect CPG retail prices (preferred)
@@ -65,7 +65,7 @@ function buildGradeRetailMap(sales: PriceResult["recent_sales"]): Map<string, nu
       }
     }
   }
-  // Second pass: fill in missing grades from Greensheet wholesale prices
+  // Second pass: fill in missing grades from Greensheet retail prices
   // (these are the best available proxy when no CPG retail exists)
   for (const sale of sales) {
     const source = sale.source?.toLowerCase() || "";

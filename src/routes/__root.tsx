@@ -4,6 +4,19 @@ import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 
 export const Route = createRootRoute({
+  head: () => ({
+    title: "LastNoteSold — Real-Time Paper Money Pricing for Live Streamers",
+    meta: [
+      {
+        name: "description",
+        content:
+          "Instant paper money pricing from Greensheet CPG and eBay. Built for Whatnot, TikTok Live, and eBay Live streamers.",
+      },
+    ],
+    links: [
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+    ],
+  }),
   component: RootComponent,
 });
 

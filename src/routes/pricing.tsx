@@ -62,7 +62,7 @@ const faqs = [
   },
   {
     q: "Where does the pricing data come from?",
-    a: "We pull real-time pricing from three sources: eBay Active listings, Greensheet/CPG dealer pricing (wholesale + retail by grade), and Sold-Comps (actual eBay sold transaction prices).",
+    a: "We pull real-time pricing from three sources: eBay Active listings, Greensheet/CPG dealer pricing (retail by grade), and Sold-Comps (actual eBay sold transaction prices).",
   },
   {
     q: "How fast are the lookups?",
