@@ -53,7 +53,7 @@ export default function Header() {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-5">
+        <nav className="hidden sm:flex items-center gap-5">
           {navLinks.map((link) => (
             <Link
               key={link.to}
@@ -74,7 +74,7 @@ export default function Header() {
         {/* Mobile hamburger */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-gray-300 hover:text-emerald-400 transition-colors"
+          className="sm:hidden flex items-center justify-center w-10 h-10 rounded-lg text-gray-300 hover:text-emerald-400 transition-colors"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
         >
           {menuOpen ? (
@@ -91,7 +91,7 @@ export default function Header() {
 
       {/* Mobile menu overlay */}
       {menuOpen && (
-        <div className="md:hidden fixed inset-0 top-0 z-40">
+        <div className="sm:hidden fixed inset-0 top-0 z-40">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
