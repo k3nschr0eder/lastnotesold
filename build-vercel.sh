@@ -590,7 +590,7 @@ async function handleSubscriptions(auth) {
     var hasMore = true;
     var startingAfter;
     while (hasMore) {
-      var url = "https://api.stripe.com/v1/subscriptions?status=" + status + "&limit=100" +
+      var url = "https://api.stripe.com/v1/subscriptions?status=" + status + "&limit=100&expand[]=data.items.data.price.product" +
         (startingAfter ? "&starting_after=" + startingAfter : "");
       var res = await fetch(url, { headers: { Authorization: auth } });
       var data = await res.json();
@@ -643,15 +643,17 @@ async function handleSubscriptions(auth) {
       } catch (e3) { /* ignore */ }
     }
 
-    customers.push({
-      customerId: customerId,
-      email: email,
-      tier: tier,
-      listAmount: Math.round(listAmount * 100) / 100,
-      effectiveAmount: Math.round(effectiveAmount * 100) / 100,
-      discount: discount,
-      status: sub.status,
-    });
+    if (item && item.price?.product?.name && item.price.product.name.toLowerCase().includes("lastnotesold")) {
+      customers.push({
+        customerId: customerId,
+        email: email,
+        tier: tier,
+        listAmount: Math.round(listAmount * 100) / 100,
+        effectiveAmount: Math.round(effectiveAmount * 100) / 100,
+        discount: discount,
+        status: sub.status,
+      });
+    }
   }
 
   return { customers: customers };
@@ -663,7 +665,7 @@ async function handleSubscriptionsKpi(auth) {
   var startingAfter;
 
   while (hasMore) {
-    var url = "https://api.stripe.com/v1/subscriptions?status=active&limit=100" +
+    var url = "https://api.stripe.com/v1/subscriptions?status=active&limit=100&expand[]=data.items.data.price.product" +
       (startingAfter ? "&starting_after=" + startingAfter : "");
     var res = await fetch(url, { headers: { Authorization: auth } });
     var data = await res.json();
@@ -677,23 +679,25 @@ async function handleSubscriptionsKpi(auth) {
   for (var i = 0; i < activeSubs.length; i++) {
     var sub = activeSubs[i];
     var item = sub.items?.data?.[0];
-    var unitAmount = item?.price?.unit_amount || item?.plan?.amount || 0;
-    var quantity = item?.quantity || 1;
-    listMrr += (unitAmount / 100) * quantity;
+    if (item && item.price?.product?.name && item.price.product.name.toLowerCase().includes("lastnotesold")) {
+      var unitAmount = item?.price?.unit_amount || item?.plan?.amount || 0;
+      var quantity = item?.quantity || 1;
+      listMrr += (unitAmount / 100) * quantity;
 
-    if (sub.latest_invoice) {
-      try {
-        var invRes = await fetch(
-          "https://api.stripe.com/v1/invoices/" + sub.latest_invoice,
-          { headers: { Authorization: auth } },
-        );
-        var inv = await invRes.json();
-        effectiveMrr += (inv.amount_paid || inv.total || 0) / 100;
-      } catch (e2) {
+      if (sub.latest_invoice) {
+        try {
+          var invRes = await fetch(
+            "https://api.stripe.com/v1/invoices/" + sub.latest_invoice,
+            { headers: { Authorization: auth } },
+          );
+          var inv = await invRes.json();
+          effectiveMrr += (inv.amount_paid || inv.total || 0) / 100;
+        } catch (e2) {
+          effectiveMrr += (unitAmount / 100) * quantity;
+        }
+      } else {
         effectiveMrr += (unitAmount / 100) * quantity;
       }
-    } else {
-      effectiveMrr += (unitAmount / 100) * quantity;
     }
   }
 
@@ -703,13 +707,16 @@ async function handleSubscriptionsKpi(auth) {
   startingAfter = undefined;
 
   while (hasMore) {
-    var url2 = "https://api.stripe.com/v1/subscriptions?status=canceled&limit=100" +
+    var url2 = "https://api.stripe.com/v1/subscriptions?status=canceled&limit=100&expand[]=data.items.data.price.product" +
       (startingAfter ? "&starting_after=" + startingAfter : "");
     var res2 = await fetch(url2, { headers: { Authorization: auth } });
     var data2 = await res2.json();
     for (var j = 0; j < (data2.data || []).length; j++) {
       var sub2 = data2.data[j];
-      if (sub2.canceled_at && sub2.canceled_at >= thirtyDaysAgo) canceledCount++;
+      var item2 = sub2.items?.data?.[0];
+      if (item2 && item2.price?.product?.name && item2.price.product.name.toLowerCase().includes("lastnotesold")) {
+        if (sub2.canceled_at && sub2.canceled_at >= thirtyDaysAgo) canceledCount++;
+      }
     }
     hasMore = data2.has_more;
     startingAfter = data2.data?.length ? data2.data[data2.data.length - 1].id : undefined;

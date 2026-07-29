@@ -26,7 +26,7 @@ export const getAdminSubscriptions = createServerFn({ method: "GET" }).handler(a
       let startingAfter: string | undefined;
       while (hasMore) {
         const url =
-          `https://api.stripe.com/v1/subscriptions?status=${status}&limit=100` +
+          `https://api.stripe.com/v1/subscriptions?status=${status}&limit=100&expand[]=data.items.data.price.product` +
           (startingAfter ? `&starting_after=${startingAfter}` : "");
         const res = await fetch(url, { headers: { Authorization: auth } });
         const data = await res.json();
@@ -78,15 +78,17 @@ export const getAdminSubscriptions = createServerFn({ method: "GET" }).handler(a
         } catch { /* ignore */ }
       }
 
-      customers.push({
-        customerId,
-        email,
-        tier,
-        listAmount: Math.round(listAmount * 100) / 100,
-        effectiveAmount: Math.round(effectiveAmount * 100) / 100,
-        discount,
-        status: sub.status,
-      });
+      if (item && item.price?.product?.name && item.price.product.name.toLowerCase().includes("lastnotesold")) {
+        customers.push({
+          customerId,
+          email,
+          tier,
+          listAmount: Math.round(listAmount * 100) / 100,
+          effectiveAmount: Math.round(effectiveAmount * 100) / 100,
+          discount,
+          status: sub.status,
+        });
+      }
     }
 
     return { customers };
