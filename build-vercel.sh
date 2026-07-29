@@ -472,6 +472,487 @@ cat > .vercel/output/functions/chat.func/.vc-config.json << 'JSON'
 { "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
 JSON
 
+# Create admin API function
+mkdir -p .vercel/output/functions/admin.func
+cat > .vercel/output/functions/admin.func/index.mjs << 'ADMINEND'
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+function getSigningSecret() {
+  return process.env.ADMIN_SECRET || process.env.STRIPE_SECRET_KEY || "dev-fallback-secret";
+}
+
+function sign(value) {
+  const hmac = createHmac("sha256", getSigningSecret());
+  hmac.update(value);
+  return value + "." + hmac.digest("hex");
+}
+
+function verifyCookie(signed) {
+  const lastDot = signed.lastIndexOf(".");
+  if (lastDot < 0) return null;
+  const value = signed.substring(0, lastDot);
+  const expected = sign(value);
+  try {
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signed);
+    if (a.length !== b.length) return null;
+    return timingSafeEqual(a, b) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function getCookies(req) {
+  const cookieHeader = req.headers.cookie || "";
+  const cookies = {};
+  cookieHeader.split(";").forEach(function(pair) {
+    var eq = pair.indexOf("=");
+    if (eq > 0) {
+      cookies[pair.substring(0, eq).trim()] = pair.substring(eq + 1).trim();
+    }
+  });
+  return cookies;
+}
+
+function checkAdminSession(req) {
+  var cookies = getCookies(req);
+  var cookie = cookies["lns_admin"];
+  if (!cookie) return null;
+  var email = verifyCookie(cookie);
+  if (!email) return null;
+  var admins = (process.env.ADMIN_EMAILS || "").split(",").map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+  var superadmins = (process.env.SUPERADMIN_EMAILS || "").split(",").map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+  if (!admins.includes(email)) return null;
+  return { email: email, isSuperadmin: superadmins.includes(email) };
+}
+
+function getTursoConfig() {
+  var dbUrl = process.env.TEAM_DB_URL;
+  var token = process.env.TEAM_DB_AUTH_TOKEN;
+  if (!dbUrl || !token) return null;
+  return { url: dbUrl.replace("libsql://", "https://"), token: token };
+}
+
+async function runQuery(sql, params) {
+  var cfg = getTursoConfig();
+  if (!cfg) return [];
+  params = params || [];
+  try {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function() { ctrl.abort(); }, 8000);
+    var r = await fetch(cfg.url + "/v2/pipeline", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + cfg.token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requests: [
+          { type: "execute", stmt: { sql: sql, args: params.map(function(v) { return { type: "text", value: String(v) }; }) } },
+          { type: "close" },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    var j = await r.json();
+    var results = j.results?.[0]?.response?.result;
+    var rows = results?.rows || [];
+    var cols = (results?.cols || []).map(function(c) { return c.name; });
+    return rows.map(function(row) {
+      var obj = {};
+      if (Array.isArray(row) && cols.length > 0) {
+        row.forEach(function(cell, i) { obj[cols[i]] = cell?.value; });
+      } else if (row.columns) {
+        row.columns.forEach(function(c) { obj[c.name] = c.value; });
+      } else {
+        Object.keys(row).forEach(function(k) { obj[k] = row[k]?.value != null ? row[k].value : row[k]; });
+      }
+      return obj;
+    });
+  } catch (e) { return []; }
+}
+
+async function getBody(req) {
+  return new Promise(function(resolve, reject) {
+    var chunks = [];
+    req.on("data", function(chunk) { chunks.push(chunk); });
+    req.on("end", function() { resolve(Buffer.concat(chunks).toString("utf-8")); });
+    req.on("error", reject);
+  });
+}
+
+async function handleSubscriptions(auth) {
+  var allSubs = [];
+  var statuses = ["active", "past_due", "unpaid", "canceled", "incomplete", "incomplete_expired"];
+  for (var si = 0; si < statuses.length; si++) {
+    var status = statuses[si];
+    var hasMore = true;
+    var startingAfter;
+    while (hasMore) {
+      var url = "https://api.stripe.com/v1/subscriptions?status=" + status + "&limit=100" +
+        (startingAfter ? "&starting_after=" + startingAfter : "");
+      var res = await fetch(url, { headers: { Authorization: auth } });
+      var data = await res.json();
+      allSubs.push.apply(allSubs, data.data || []);
+      hasMore = data.has_more;
+      startingAfter = data.data?.length ? data.data[data.data.length - 1].id : undefined;
+    }
+  }
+
+  var customerCache = new Map();
+  var customers = [];
+
+  for (var i = 0; i < allSubs.length; i++) {
+    var sub = allSubs[i];
+    var customerId = sub.customer;
+    var email = customerCache.get(customerId) || "";
+    if (!email) {
+      try {
+        var cRes = await fetch("https://api.stripe.com/v1/customers/" + customerId, {
+          headers: { Authorization: auth },
+        });
+        var cData = await cRes.json();
+        email = cData.email || customerId;
+        customerCache.set(customerId, email);
+      } catch (e2) {
+        email = customerId;
+      }
+    }
+
+    var item = sub.items?.data?.[0];
+    var listUnitAmount = (item?.price?.unit_amount || item?.plan?.amount || 0) / 100;
+    var quantity = item?.quantity || 1;
+    var listAmount = listUnitAmount * quantity;
+    var priceId = item?.price?.id || "";
+    var tier = (priceId.includes("TwOty") || priceId.includes("TwCvM")) ? "premier" : "pro";
+
+    var effectiveAmount = listAmount;
+    var discount = null;
+    if (sub.latest_invoice) {
+      try {
+        var invRes = await fetch(
+          "https://api.stripe.com/v1/invoices/" + sub.latest_invoice,
+          { headers: { Authorization: auth } },
+        );
+        var inv = await invRes.json();
+        effectiveAmount = (inv.amount_paid || inv.total || 0) / 100;
+        if (effectiveAmount < listAmount) {
+          discount = Math.round((listAmount - effectiveAmount) * 100) / 100;
+        }
+      } catch (e3) { /* ignore */ }
+    }
+
+    customers.push({
+      customerId: customerId,
+      email: email,
+      tier: tier,
+      listAmount: Math.round(listAmount * 100) / 100,
+      effectiveAmount: Math.round(effectiveAmount * 100) / 100,
+      discount: discount,
+      status: sub.status,
+    });
+  }
+
+  return { customers: customers };
+}
+
+async function handleSubscriptionsKpi(auth) {
+  var activeSubs = [];
+  var hasMore = true;
+  var startingAfter;
+
+  while (hasMore) {
+    var url = "https://api.stripe.com/v1/subscriptions?status=active&limit=100" +
+      (startingAfter ? "&starting_after=" + startingAfter : "");
+    var res = await fetch(url, { headers: { Authorization: auth } });
+    var data = await res.json();
+    activeSubs.push.apply(activeSubs, data.data || []);
+    hasMore = data.has_more;
+    startingAfter = data.data?.length ? data.data[data.data.length - 1].id : undefined;
+  }
+
+  var listMrr = 0;
+  var effectiveMrr = 0;
+  for (var i = 0; i < activeSubs.length; i++) {
+    var sub = activeSubs[i];
+    var item = sub.items?.data?.[0];
+    var unitAmount = item?.price?.unit_amount || item?.plan?.amount || 0;
+    var quantity = item?.quantity || 1;
+    listMrr += (unitAmount / 100) * quantity;
+
+    if (sub.latest_invoice) {
+      try {
+        var invRes = await fetch(
+          "https://api.stripe.com/v1/invoices/" + sub.latest_invoice,
+          { headers: { Authorization: auth } },
+        );
+        var inv = await invRes.json();
+        effectiveMrr += (inv.amount_paid || inv.total || 0) / 100;
+      } catch (e2) {
+        effectiveMrr += (unitAmount / 100) * quantity;
+      }
+    } else {
+      effectiveMrr += (unitAmount / 100) * quantity;
+    }
+  }
+
+  var thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
+  var canceledCount = 0;
+  hasMore = true;
+  startingAfter = undefined;
+
+  while (hasMore) {
+    var url2 = "https://api.stripe.com/v1/subscriptions?status=canceled&limit=100" +
+      (startingAfter ? "&starting_after=" + startingAfter : "");
+    var res2 = await fetch(url2, { headers: { Authorization: auth } });
+    var data2 = await res2.json();
+    for (var j = 0; j < (data2.data || []).length; j++) {
+      var sub2 = data2.data[j];
+      if (sub2.canceled_at && sub2.canceled_at >= thirtyDaysAgo) canceledCount++;
+    }
+    hasMore = data2.has_more;
+    startingAfter = data2.data?.length ? data2.data[data2.data.length - 1].id : undefined;
+  }
+
+  var totalActive = activeSubs.length;
+  var churnRate = totalActive > 0 ? canceledCount / totalActive : 0;
+
+  return {
+    listMrr: Math.round(listMrr * 100) / 100,
+    effectiveMrr: Math.round(effectiveMrr * 100) / 100,
+    activeSubscribers: totalActive,
+    churnRate: Math.round(churnRate * 10000) / 100,
+  };
+}
+
+async function handleCoupons(auth) {
+  var allCoupons = [];
+  var hasMore = true;
+  var startingAfter;
+  while (hasMore) {
+    var url = "https://api.stripe.com/v1/coupons?limit=100" +
+      (startingAfter ? "&starting_after=" + startingAfter : "");
+    var res = await fetch(url, { headers: { Authorization: auth } });
+    var data = await res.json();
+    allCoupons.push.apply(allCoupons, data.data || []);
+    hasMore = data.has_more;
+    startingAfter = data.data?.length ? data.data[data.data.length - 1].id : undefined;
+  }
+
+  var allPromoCodes = [];
+  hasMore = true;
+  startingAfter = undefined;
+  while (hasMore) {
+    var url2 = "https://api.stripe.com/v1/promotion_codes?limit=100" +
+      (startingAfter ? "&starting_after=" + startingAfter : "");
+    var res2 = await fetch(url2, { headers: { Authorization: auth } });
+    var data2 = await res2.json();
+    allPromoCodes.push.apply(allPromoCodes, data2.data || []);
+    hasMore = data2.has_more;
+    startingAfter = data2.data?.length ? data2.data[data2.data.length - 1].id : undefined;
+  }
+
+  var coupons = allCoupons.map(function(c) {
+    return {
+      id: c.id,
+      code: c.name || c.id,
+      discountType: c.amount_off ? "fixed" : c.percent_off ? "percent" : "unknown",
+      amount: c.amount_off ? c.amount_off / 100 : c.percent_off || 0,
+      currency: c.currency || "",
+      duration: c.duration,
+      durationInMonths: c.duration_in_months || null,
+      timesRedeemed: c.times_redeemed || 0,
+      maxRedemptions: c.max_redemptions || null,
+      validUntil: c.redeem_by ? new Date(c.redeem_by * 1000).toISOString() : null,
+      active: c.valid,
+      isPromotionCode: false,
+    };
+  });
+
+  for (var i = 0; i < allPromoCodes.length; i++) {
+    var pc = allPromoCodes[i];
+    var c = pc.coupon;
+    coupons.push({
+      id: pc.id,
+      code: pc.code,
+      discountType: c.amount_off ? "fixed" : c.percent_off ? "percent" : "unknown",
+      amount: c.amount_off ? c.amount_off / 100 : c.percent_off || 0,
+      currency: c.currency || "",
+      duration: c.duration,
+      durationInMonths: c.duration_in_months || null,
+      timesRedeemed: c.times_redeemed || 0,
+      maxRedemptions: pc.max_redemptions || c.max_redemptions || null,
+      validUntil: pc.expires_at ? new Date(pc.expires_at * 1000).toISOString() : null,
+      active: pc.active,
+      isPromotionCode: true,
+    });
+  }
+
+  return { coupons: coupons };
+}
+
+async function handleReferrals() {
+  var totalRef = await runQuery("SELECT COUNT(*) as c FROM referrals");
+  var totalReferrals = Number(totalRef[0]?.c || 0);
+  var totalClick = await runQuery("SELECT COUNT(*) as c FROM referral_clicks");
+  var totalClicks = Number(totalClick[0]?.c || 0);
+  var totalConv = await runQuery("SELECT COUNT(*) as c, COALESCE(SUM(bounty_amount_cents), 0) as total FROM referral_conversions");
+  var totalConversions = Number(totalConv[0]?.c || 0);
+  var totalBounties = Number(totalConv[0]?.total || 0);
+
+  var topRef = await runQuery(
+    "SELECT r.code, " +
+    "(SELECT COUNT(*) FROM referral_clicks c WHERE c.code = r.code) as clicks, " +
+    "(SELECT COUNT(*) FROM referral_conversions v WHERE v.code = r.code) as conversions, " +
+    "(SELECT COALESCE(SUM(v2.bounty_amount_cents), 0) FROM referral_conversions v2 WHERE v2.code = r.code) as bounties " +
+    "FROM referrals r ORDER BY conversions DESC LIMIT 20"
+  );
+
+  var topReferrers = topRef.map(function(r) {
+    return {
+      code: r.code || "",
+      clicks: Number(r.clicks || 0),
+      conversions: Number(r.conversions || 0),
+      bountiesEarned: Number(r.bounties || 0),
+    };
+  });
+
+  var conversionRate = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
+
+  return {
+    totalReferrals: totalReferrals,
+    totalClicks: totalClicks,
+    totalConversions: totalConversions,
+    conversionRate: Math.round(conversionRate * 100) / 100,
+    totalBounties: totalBounties,
+    topReferrers: topReferrers,
+  };
+}
+
+function json(res, code, body) {
+  res.statusCode = code;
+  res.setHeader("content-type", "application/json");
+  res.end(JSON.stringify(body));
+}
+
+export default async function handler(req, res) {
+  var url = req.url || "";
+
+  // POST /api/admin/login
+  if (url.includes("/api/admin/login") && req.method === "POST") {
+    try {
+      var body = await getBody(req);
+      var data = JSON.parse(body || "{}");
+      var email = (data.email || "").trim().toLowerCase();
+      var password = (data.password || "").trim();
+
+      if (!email || !password) {
+        return json(res, 401, { error: "Email and password required" });
+      }
+
+      var admins = (process.env.ADMIN_EMAILS || "")
+        .split(",").map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+
+      if (!admins.includes(email)) {
+        return json(res, 401, { error: "Not authorized" });
+      }
+
+      var adminPassword = process.env.ADMIN_PASSWORD;
+      if (!adminPassword || password !== adminPassword) {
+        return json(res, 401, { error: "Invalid credentials" });
+      }
+
+      var superadmins = (process.env.SUPERADMIN_EMAILS || "")
+        .split(",").map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+
+      var signed = sign(email);
+      res.setHeader("Set-Cookie",
+        "lns_admin=" + signed + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400");
+      return json(res, 200, { success: true, email: email, isSuperadmin: superadmins.includes(email) });
+    } catch (e) {
+      console.error("[Admin] Login error:", e);
+      return json(res, 500, { error: "Internal server error" });
+    }
+  }
+
+  // GET /api/admin/session
+  if (url.includes("/api/admin/session") && req.method === "GET") {
+    var session = checkAdminSession(req);
+    if (!session) {
+      return json(res, 401, { error: "Not authenticated" });
+    }
+    return json(res, 200, { email: session.email, isSuperadmin: session.isSuperadmin });
+  }
+
+  // POST /api/admin/logout
+  if (url.includes("/api/admin/logout") && req.method === "POST") {
+    res.setHeader("Set-Cookie",
+      "lns_admin=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+    return json(res, 200, { success: true });
+  }
+
+  // All remaining routes require admin session
+  if (!checkAdminSession(req)) {
+    return json(res, 401, { error: "Not authenticated" });
+  }
+
+  var key = process.env.STRIPE_SECRET_KEY || "";
+  var auth = "Basic " + Buffer.from(key + ":").toString("base64");
+
+  // GET /api/admin/subscriptions-kpi
+  if (url.includes("/api/admin/subscriptions-kpi") && req.method === "GET") {
+    try {
+      var kpi = await handleSubscriptionsKpi(auth);
+      return json(res, 200, kpi);
+    } catch (e) {
+      console.error("[Admin] Subscriptions KPI error:", e);
+      return json(res, 200, { listMrr: 0, effectiveMrr: 0, activeSubscribers: 0, churnRate: 0 });
+    }
+  }
+
+  // GET /api/admin/subscriptions
+  if (url.includes("/api/admin/subscriptions") && req.method === "GET") {
+    try {
+      var subData = await handleSubscriptions(auth);
+      return json(res, 200, subData);
+    } catch (e) {
+      console.error("[Admin] Subscriptions error:", e);
+      return json(res, 200, { customers: [], error: String(e) });
+    }
+  }
+
+  // GET /api/admin/coupons
+  if (url.includes("/api/admin/coupons") && req.method === "GET") {
+    try {
+      var couponData = await handleCoupons(auth);
+      return json(res, 200, couponData);
+    } catch (e) {
+      console.error("[Admin] Coupons error:", e);
+      return json(res, 200, { coupons: [], error: String(e) });
+    }
+  }
+
+  // GET /api/admin/referrals
+  if (url.includes("/api/admin/referrals") && req.method === "GET") {
+    try {
+      var refData = await handleReferrals();
+      return json(res, 200, refData);
+    } catch (e) {
+      console.error("[Admin] Referrals error:", e);
+      return json(res, 200, { totalReferrals: 0, totalClicks: 0, totalConversions: 0, conversionRate: 0, totalBounties: 0, topReferrers: [] });
+    }
+  }
+
+  // 404 for unmatched admin routes
+  return json(res, 404, { error: "Not found" });
+}
+ADMINEND
+
+cat > .vercel/output/functions/admin.func/.vc-config.json << 'JSON'
+{ "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
+JSON
+
 cat > .vercel/output/config.json <<'JSON'
 { "version": 3, "routes": [
   { "src": "/api/webhook", "dest": "/webhook" },
@@ -483,6 +964,7 @@ cat > .vercel/output/config.json <<'JSON'
   { "src": "/api/referral-click", "dest": "/referral" },
   { "src": "/api/referral-conversion", "dest": "/referral" },
   { "src": "/api/chat", "dest": "/chat" },
+  { "src": "/api/admin/(.*)", "dest": "/admin" },
   { "src": "^/(?!referrals$|support$|privacy$|terms-of-service$|pricing$|about$)([A-Za-z0-9][A-Za-z0-9-]{1,18}[A-Za-z0-9])$", "dest": "/redirect?code=$1" },
   { "handle": "filesystem" },
   { "src": "/(.*)", "dest": "/render" }
