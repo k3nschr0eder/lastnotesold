@@ -643,7 +643,7 @@ async function handleSubscriptions(auth) {
       } catch (e3) { /* ignore */ }
     }
 
-    if (item && item.price?.product?.name && item.price.product.name.toLowerCase().includes("lastnotesold")) {
+    if (item && (item.price?.product?.name || "").toLowerCase().includes("lastnotesold")) {
       customers.push({
         customerId: customerId,
         email: email,
@@ -679,7 +679,7 @@ async function handleSubscriptionsKpi(auth) {
   for (var i = 0; i < activeSubs.length; i++) {
     var sub = activeSubs[i];
     var item = sub.items?.data?.[0];
-    if (item && item.price?.product?.name && item.price.product.name.toLowerCase().includes("lastnotesold")) {
+    if (item && (item.price?.product?.name || "").toLowerCase().includes("lastnotesold")) {
       var unitAmount = item?.price?.unit_amount || item?.plan?.amount || 0;
       var quantity = item?.quantity || 1;
       listMrr += (unitAmount / 100) * quantity;
@@ -714,9 +714,7 @@ async function handleSubscriptionsKpi(auth) {
     for (var j = 0; j < (data2.data || []).length; j++) {
       var sub2 = data2.data[j];
       var item2 = sub2.items?.data?.[0];
-      if (item2 && item2.price?.product?.name && item2.price.product.name.toLowerCase().includes("lastnotesold")) {
-        if (sub2.canceled_at && sub2.canceled_at >= thirtyDaysAgo) canceledCount++;
-      }
+      if (item2 && (item2.price?.product?.name || "").toLowerCase().includes("lastnotesold") && sub2.canceled_at && sub2.canceled_at >= thirtyDaysAgo) canceledCount++;
     }
     hasMore = data2.has_more;
     startingAfter = data2.data?.length ? data2.data[data2.data.length - 1].id : undefined;
