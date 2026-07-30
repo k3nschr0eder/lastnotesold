@@ -72,7 +72,7 @@ async function getTierForCustomer(customerId: string): Promise<TierConfig> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(
-      `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1&expand[]=data.items.data.price.product`,
+      `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1`,
       { headers: { Authorization: "Basic " + btoa(key + ":") }, signal: controller.signal },
     );
     clearTimeout(timer);
@@ -81,14 +81,8 @@ async function getTierForCustomer(customerId: string): Promise<TierConfig> {
     
     if (!sub) return { ...FREE_TIER };
 
-    // Filter: only recognize LastNoteSold subscriptions (not LastSoldCoin)
+    // Determine tier: check price ID first (most reliable), fall back to product name
     const item = sub.items?.data?.[0];
-    const productName: string = item?.price?.product?.name || "";
-    if (!productName.toLowerCase().includes("lastnotesold")) {
-      console.log(`[Tiers] Customer ${customerId}: non-LastNoteSold product "${productName}" — treating as free`);
-      return { ...FREE_TIER };
-    }
-
     const priceId: string = item?.price?.id;
     let tier: TierName;
     if (ALL_PRICE_IDS.PREMIER.includes(priceId)) {
@@ -96,8 +90,29 @@ async function getTierForCustomer(customerId: string): Promise<TierConfig> {
     } else if (ALL_PRICE_IDS.PRO.includes(priceId)) {
       tier = "pro";
     } else {
-      // Unrecognized LastNoteSold price ID — default to pro
-      tier = "pro";
+      // Price ID not recognized — fetch product name separately to check brand
+      const productId: string = item?.price?.product;
+      if (productId) {
+        try {
+          const prodRes = await fetch(`https://api.stripe.com/v1/products/${productId}`, {
+            headers: { Authorization: "Basic " + btoa(key + ":") },
+            signal: AbortSignal.timeout(5000),
+          });
+          const prod = await prodRes.json();
+          const productName: string = prod.name || "";
+          if (productName.toLowerCase().includes("lastnotesold")) {
+            tier = "pro";
+          } else {
+            console.log(`[Tiers] Customer ${customerId}: non-LastNoteSold product "${productName}" — treating as free`);
+            return { ...FREE_TIER };
+          }
+        } catch(e) {
+          console.error(`[Tiers] Product lookup failed for ${customerId}:`, e);
+          return { ...FREE_TIER };
+        }
+      } else {
+        return { ...FREE_TIER };
+      }
     }
 
     const config = tier === "premier" ? {
