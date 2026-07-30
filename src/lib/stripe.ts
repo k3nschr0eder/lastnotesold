@@ -19,10 +19,10 @@ export const PRICES = {
   PREMIER_MONTHLY: "price_1TwOtyExpuSFJTtEmSxDgmmp",
 } as const;
 
-/** Backward-compatible: all known price IDs for tier detection */
+/** All LastNoteSold price IDs for tier detection */
 export const ALL_PRICE_IDS = {
-  PRO: ["price_1TwCf6ExpuSFJTtEDxfhjh9K", "price_1TwOtrExpuSFJTtEH7NTOh0O"],
-  PREMIER: ["price_1TwCvMExpuSFJTtEyAWio9zL", "price_1TwOtyExpuSFJTtEmSxDgmmp"],
+  PRO: ["price_1TwOtrExpuSFJTtEH7NTOh0O"],
+  PREMIER: ["price_1TwOtyExpuSFJTtEmSxDgmmp"],
 } as const;
 
 /**

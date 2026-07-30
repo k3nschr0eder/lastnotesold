@@ -72,7 +72,7 @@ async function getTierForCustomer(customerId: string): Promise<TierConfig> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(
-      `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1`,
+      `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1&expand[]=data.items.data.price.product`,
       { headers: { Authorization: "Basic " + btoa(key + ":") }, signal: controller.signal },
     );
     clearTimeout(timer);
@@ -81,8 +81,24 @@ async function getTierForCustomer(customerId: string): Promise<TierConfig> {
     
     if (!sub) return { ...FREE_TIER };
 
-    const priceId: string = sub.items?.data?.[0]?.price?.id;
-    const tier: TierName = ALL_PRICE_IDS.PREMIER.includes(priceId) ? "premier" : "pro";
+    // Filter: only recognize LastNoteSold subscriptions (not LastSoldCoin)
+    const item = sub.items?.data?.[0];
+    const productName: string = item?.price?.product?.name || "";
+    if (!productName.toLowerCase().includes("lastnotesold")) {
+      console.log(`[Tiers] Customer ${customerId}: non-LastNoteSold product "${productName}" — treating as free`);
+      return { ...FREE_TIER };
+    }
+
+    const priceId: string = item?.price?.id;
+    let tier: TierName;
+    if (ALL_PRICE_IDS.PREMIER.includes(priceId)) {
+      tier = "premier";
+    } else if (ALL_PRICE_IDS.PRO.includes(priceId)) {
+      tier = "pro";
+    } else {
+      // Unrecognized LastNoteSold price ID — default to pro
+      tier = "pro";
+    }
 
     const config = tier === "premier" ? {
       tier: "premier" as TierName,

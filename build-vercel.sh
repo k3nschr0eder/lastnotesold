@@ -114,8 +114,44 @@ export default async function handler(req, res) {
 
     if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
       const sub = event.data.object;
-      const PREMIER = "price_1TwOtyExpuSFJTtEmSxDgmmp";
-      const tier = sub.items?.data?.[0]?.price?.id === PREMIER ? "premier" : "pro";
+      const item = sub.items?.data?.[0];
+      
+      // Resolve product name: may be expanded (object) or just an ID (string)
+      let productName = "";
+      if (item?.price?.product) {
+        if (typeof item.price.product === "string") {
+          // Product not expanded — fetch it
+          try {
+            const key = process.env.STRIPE_SECRET_KEY || "";
+            const prodRes = await fetch(`https://api.stripe.com/v1/products/${item.price.product}`, {
+              headers: { "Authorization": "Basic " + Buffer.from(key + ":").toString("base64") },
+            });
+            const prod = await prodRes.json();
+            productName = prod.name || "";
+          } catch(e) {
+            console.error("[Webhook] Product lookup failed:", e);
+          }
+        } else {
+          productName = item.price.product.name || "";
+        }
+      }
+      
+      // Only process LastNoteSold subscriptions — skip LastSoldCoin ones
+      if (!productName.toLowerCase().includes("lastnotesold")) {
+        console.log("[Webhook] Skipping non-LastNoteSold subscription:", productName);
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ received: true, skipped: true }));
+        return;
+      }
+      
+      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
+      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+      const priceId = item?.price?.id;
+      let tier = "pro";
+      if (PREMIER_PRICES.includes(priceId)) tier = "premier";
+      else if (PRO_PRICES.includes(priceId)) tier = "pro";
+      
       const periodEnd = new Date(sub.current_period_end * 1000).toISOString();
       const base = `https://${req.headers.host}`;
 
@@ -179,14 +215,33 @@ export default async function handler(req, res) {
     try {
       const key = process.env.STRIPE_SECRET_KEY || "";
       const stripeRes = await fetch(
-        `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1`,
+        `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1&expand[]=data.items.data.price.product`,
         { headers: { "Authorization": "Basic " + Buffer.from(key + ":").toString("base64") } },
       );
       const data = await stripeRes.json();
       const sub = data.data?.[0];
-      const priceId = sub?.items?.data?.[0]?.price?.id;
-      const PREMIER_PRICE = "price_1TwOtyExpuSFJTtEmSxDgmmp";
-      const tier = priceId === PREMIER_PRICE ? "premier" : (sub ? "pro" : "free");
+      const item = sub?.items?.data?.[0];
+      
+      // Filter: only recognize LastNoteSold subscriptions (not LastSoldCoin)
+      const productName = (item?.price?.product?.name || "").toLowerCase();
+      if (!productName.includes("lastnotesold")) {
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ tier: "free" }));
+        return;
+      }
+      
+      const priceId = item?.price?.id;
+      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
+      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+      let tier;
+      if (PREMIER_PRICES.includes(priceId)) {
+        tier = "premier";
+      } else if (PRO_PRICES.includes(priceId)) {
+        tier = "pro";
+      } else {
+        tier = sub ? "pro" : "free";
+      }
       res.statusCode = 200;
       res.setHeader("content-type", "application/json");
       res.end(JSON.stringify({ tier }));
