@@ -267,6 +267,38 @@ export default async function handler(req, res) {
     return;
   }
 
+  // GET /api/debug-subscriptions?customerId=... — raw Stripe response (temporary debug)
+  if (url.includes("/api/debug-subscriptions") && req.method === "GET") {
+    const params = new URL(url, "http://localhost").searchParams;
+    const customerId = params.get("customerId");
+    if (!customerId) {
+      res.statusCode = 400;
+      res.setHeader("content-type", "application/json");
+      res.setHeader("access-control-allow-origin", "*");
+      res.end(JSON.stringify({ error: "Missing customerId" }));
+      return;
+    }
+    try {
+      const key = process.env.STRIPE_SECRET_KEY || "";
+      const stripeRes = await fetch(
+        `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1`,
+        { headers: { "Authorization": "Basic " + Buffer.from(key + ":").toString("base64") } },
+      );
+      const data = await stripeRes.json();
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.setHeader("access-control-allow-origin", "*");
+      res.end(JSON.stringify(data));
+    } catch (e) {
+      console.error("[DebugSubs] Error:", e);
+      res.statusCode = 500;
+      res.setHeader("content-type", "application/json");
+      res.setHeader("access-control-allow-origin", "*");
+      res.end(JSON.stringify({ error: "Stripe lookup failed", detail: String(e) }));
+    }
+    return;
+  }
+
   // GET /api/session?session_id=... — look up customer ID after checkout
   if (url.includes("/api/session") && req.method === "GET") {
     const params = new URL(url, "http://localhost").searchParams;
@@ -1036,6 +1068,7 @@ cat > .vercel/output/config.json <<'JSON'
   { "src": "/api/checkout", "dest": "/checkout" },
   { "src": "/api/session", "dest": "/checkout" },
   { "src": "/api/tier", "dest": "/checkout" },
+  { "src": "/api/debug-subscriptions", "dest": "/checkout" },
   { "src": "/api/sync-subscription", "dest": "/webhook" },
   { "src": "/api/referral", "dest": "/referral" },
   { "src": "/api/referral-click", "dest": "/referral" },
