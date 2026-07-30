@@ -215,22 +215,20 @@ export default async function handler(req, res) {
     try {
       const key = process.env.STRIPE_SECRET_KEY || "";
       const stripeRes = await fetch(
-        `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1&expand[]=data.items.data.price.product`,
+        `https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active&limit=1`,
         { headers: { "Authorization": "Basic " + Buffer.from(key + ":").toString("base64") } },
       );
       const data = await stripeRes.json();
       const sub = data.data?.[0];
-      const item = sub?.items?.data?.[0];
-      
-      // Filter: only recognize LastNoteSold subscriptions (not LastSoldCoin)
-      const productName = (item?.price?.product?.name || "").toLowerCase();
-      if (!productName.includes("lastnotesold")) {
+
+      if (!sub) {
         res.statusCode = 200;
         res.setHeader("content-type", "application/json");
         res.end(JSON.stringify({ tier: "free" }));
         return;
       }
-      
+
+      const item = sub.items?.data?.[0];
       const priceId = item?.price?.id;
       const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
       const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
@@ -240,7 +238,22 @@ export default async function handler(req, res) {
       } else if (PRO_PRICES.includes(priceId)) {
         tier = "pro";
       } else {
-        tier = sub ? "pro" : "free";
+        // Price ID not recognized — fetch product name separately to check brand
+        const productId = item?.price?.product;
+        if (productId && typeof productId === "string") {
+          try {
+            const prodRes = await fetch(`https://api.stripe.com/v1/products/${productId}`, {
+              headers: { "Authorization": "Basic " + Buffer.from(key + ":").toString("base64") },
+            });
+            const prod = await prodRes.json();
+            const productName = (prod.name || "").toLowerCase();
+            tier = productName.includes("lastnotesold") ? "pro" : "free";
+          } catch(e) {
+            tier = "free";
+          }
+        } else {
+          tier = "free";
+        }
       }
       res.statusCode = 200;
       res.setHeader("content-type", "application/json");
@@ -637,6 +650,10 @@ async function getBody(req) {
   });
 }
 
+var PREMIER_PRICES_ADMIN = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
+var PRO_PRICES_ADMIN = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+var LNS_PRICE_IDS_ADMIN = PREMIER_PRICES_ADMIN.concat(PRO_PRICES_ADMIN);
+
 async function handleSubscriptions(auth) {
   var allSubs = [];
   var statuses = ["active", "past_due", "unpaid", "canceled", "incomplete", "incomplete_expired"];
@@ -645,7 +662,7 @@ async function handleSubscriptions(auth) {
     var hasMore = true;
     var startingAfter;
     while (hasMore) {
-      var url = "https://api.stripe.com/v1/subscriptions?status=" + status + "&limit=100&expand[]=data.items.data.price.product" +
+      var url = "https://api.stripe.com/v1/subscriptions?status=" + status + "&limit=100" +
         (startingAfter ? "&starting_after=" + startingAfter : "");
       var res = await fetch(url, { headers: { Authorization: auth } });
       var data = await res.json();
@@ -698,7 +715,7 @@ async function handleSubscriptions(auth) {
       } catch (e3) { /* ignore */ }
     }
 
-    if (item && (item.price?.product?.name || "").toLowerCase().includes("lastnotesold")) {
+    if (item && LNS_PRICE_IDS_ADMIN.includes(item.price?.id)) {
       customers.push({
         customerId: customerId,
         email: email,
@@ -720,7 +737,7 @@ async function handleSubscriptionsKpi(auth) {
   var startingAfter;
 
   while (hasMore) {
-    var url = "https://api.stripe.com/v1/subscriptions?status=active&limit=100&expand[]=data.items.data.price.product" +
+    var url = "https://api.stripe.com/v1/subscriptions?status=active&limit=100" +
       (startingAfter ? "&starting_after=" + startingAfter : "");
     var res = await fetch(url, { headers: { Authorization: auth } });
     var data = await res.json();
@@ -734,7 +751,7 @@ async function handleSubscriptionsKpi(auth) {
   for (var i = 0; i < activeSubs.length; i++) {
     var sub = activeSubs[i];
     var item = sub.items?.data?.[0];
-    if (item && (item.price?.product?.name || "").toLowerCase().includes("lastnotesold")) {
+    if (item && LNS_PRICE_IDS_ADMIN.includes(item.price?.id)) {
       var unitAmount = item?.price?.unit_amount || item?.plan?.amount || 0;
       var quantity = item?.quantity || 1;
       listMrr += (unitAmount / 100) * quantity;
@@ -762,14 +779,14 @@ async function handleSubscriptionsKpi(auth) {
   startingAfter = undefined;
 
   while (hasMore) {
-    var url2 = "https://api.stripe.com/v1/subscriptions?status=canceled&limit=100&expand[]=data.items.data.price.product" +
+    var url2 = "https://api.stripe.com/v1/subscriptions?status=canceled&limit=100" +
       (startingAfter ? "&starting_after=" + startingAfter : "");
     var res2 = await fetch(url2, { headers: { Authorization: auth } });
     var data2 = await res2.json();
     for (var j = 0; j < (data2.data || []).length; j++) {
       var sub2 = data2.data[j];
       var item2 = sub2.items?.data?.[0];
-      if (item2 && (item2.price?.product?.name || "").toLowerCase().includes("lastnotesold") && sub2.canceled_at && sub2.canceled_at >= thirtyDaysAgo) canceledCount++;
+      if (item2 && LNS_PRICE_IDS_ADMIN.includes(item2.price?.id) && sub2.canceled_at && sub2.canceled_at >= thirtyDaysAgo) canceledCount++;
     }
     hasMore = data2.has_more;
     startingAfter = data2.data?.length ? data2.data[data2.data.length - 1].id : undefined;
