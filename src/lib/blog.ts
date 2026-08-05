@@ -43,16 +43,15 @@ async function ensureTable() {
 }
 function map(row: Row): BlogPost { return { ...row, image_url: row.image_url || null, featured: Boolean(Number(row.featured)) }; }
 // Day-of-week filter: each series only shows on its scheduled day.
-// SQLite strftime('%w'): 0=Sunday, 2=Tuesday, 4=Thursday
-// General/uncategorized posts show every day.
-const DAY_FILTER = `
-  AND (
-    category = 'General'
-    OR (category = 'Noted' AND CAST(strftime('%w', 'now') AS INTEGER) = 0)
-    OR (category = 'Currency Currents' AND CAST(strftime('%w', 'now') AS INTEGER) = 2)
-    OR (category = 'Noteworthy Notes' AND CAST(strftime('%w', 'now') AS INTEGER) = 4)
-  )`;
+// JS getDay(): 0=Sunday, 2=Tuesday, 4=Thursday. General/uncategorized shows every day.
+const DAY_MAP: Record<string, number> = { 'Noted': 0, 'Currency Currents': 2, 'Noteworthy Notes': 4 };
+function matchesToday(category: string): boolean {
+  if (category === 'General' || !DAY_MAP[category]) return true;
+  return new Date().getDay() === DAY_MAP[category];
+}
 
-export async function getAllPosts() { await ensureTable(); return (await query("SELECT * FROM blog_posts WHERE published_at <= datetime('now')" + DAY_FILTER + " ORDER BY published_at DESC")).map(map); }
-export async function getFeaturedPosts(limit = 2) { await ensureTable(); return (await query("SELECT * FROM blog_posts WHERE featured = 1 AND published_at <= datetime('now')" + DAY_FILTER + " ORDER BY published_at DESC LIMIT ?", [String(limit)])).map(map); }
+function filterByDay(posts: BlogPost[]): BlogPost[] { return posts.filter(p => matchesToday(p.category)); }
+
+export async function getAllPosts() { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE published_at <= datetime('now') ORDER BY published_at DESC")).map(map)); }
+export async function getFeaturedPosts(limit = 2) { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE featured = 1 AND published_at <= datetime('now') ORDER BY published_at DESC LIMIT ?", [String(limit)])).map(map)); }
 export async function getPostBySlug(slug: string) { await ensureTable(); const rows = await query("SELECT * FROM blog_posts WHERE slug = ? AND published_at <= datetime('now') LIMIT 1", [slug]); return rows[0] ? map(rows[0]) : null; }
