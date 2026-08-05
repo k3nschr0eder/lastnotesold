@@ -31,6 +31,7 @@ export const ALL_PRICE_IDS = {
 export async function createCheckoutSession(options: {
   tier: "pro" | "premier";
   customerEmail?: string;
+  referralCode?: string;
   successUrl: string;
   cancelUrl: string;
 }) {
@@ -46,6 +47,9 @@ export async function createCheckoutSession(options: {
     cancel_url: options.cancelUrl,
     allow_promotion_codes: true,
     billing_address_collection: "auto",
+    // Each shared referral link carries its own code — record it on the session
+    // so the webhook can attribute the conversion to that specific code.
+    metadata: options.referralCode ? { referral_code: options.referralCode } : undefined,
   });
 }
 

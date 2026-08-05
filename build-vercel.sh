@@ -1041,6 +1041,7 @@ cat > .vercel/output/config.json <<'JSON'
   { "src": "/api/referral", "dest": "/referral" },
   { "src": "/api/referral-click", "dest": "/referral" },
   { "src": "/api/referral-conversion", "dest": "/referral" },
+  { "src": "/api/referral-delete", "dest": "/referral" },
   { "src": "/api/chat", "dest": "/chat" },
   { "src": "/api/admin/(.*)", "dest": "/admin" },
   { "src": "^/(?!referrals$|support$|privacy$|terms-of-service$|pricing$|about$|blog$|dashboard$|overlays$|admin$)([A-Za-z0-9][A-Za-z0-9-]{1,18}[A-Za-z0-9])$", "dest": "/redirect?code=$1" },

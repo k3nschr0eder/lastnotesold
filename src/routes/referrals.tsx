@@ -1,15 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import ReferralWidget from "~/components/ReferralWidget";
 
-function CustomCodeForm({ customerId, currentCode, onSaved }: {
+interface CodeStat {
+  code: string;
+  clicks: number;
+  conversions: number;
+  earned: number;
+  monthlyConversions: number;
+  monthlyLimit: number;
+  remainingThisMonth: number;
+}
+
+function CustomCodeForm({ customerId, oldCode, usedSlots, codeLimit, onSaved }: {
   customerId: string;
-  currentCode: string;
+  oldCode?: string;
+  usedSlots: number;
+  codeLimit: number;
   onSaved: (newCode: string) => void;
 }) {
   const [code, setCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const isRename = !!oldCode;
+  const remaining = Math.max(0, codeLimit - usedSlots);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,14 +39,19 @@ function CustomCodeForm({ customerId, currentCode, onSaved }: {
       const r = await fetch("/api/referral", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, code: trimmed }),
+        body: JSON.stringify({
+          customerId,
+          code: trimmed,
+          ...(isRename ? { oldCode } : {}),
+        }),
       });
       const data = await r.json();
       if (data.success) {
-        setMessage({ type: "success", text: `Code set to ${data.code}!` });
+        setMessage({ type: "success", text: isRename ? `Code renamed to ${data.code}!` : `Code ${data.code} added!` });
+        setCode("");
         onSaved(data.code);
       } else {
-        setMessage({ type: "error", text: data.error || "Failed to set code." });
+        setMessage({ type: "error", text: data.error || "Failed to save code." });
       }
     } catch {
       setMessage({ type: "error", text: "Network error. Try again." });
@@ -42,16 +62,28 @@ function CustomCodeForm({ customerId, currentCode, onSaved }: {
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-5">
-      <h3 className="text-sm font-semibold text-white mb-1">Custom Referral Code</h3>
+      <h3 className="text-sm font-semibold text-white mb-1">
+        {isRename ? `Rename ${oldCode}` : "Add a Referral Code"}
+      </h3>
       <p className="text-xs text-gray-400 mb-3">
-        Set a custom code like <code className="text-emerald-400">MYCODE</code> — then share <code className="text-emerald-400">lastnotesold.com/MYCODE</code>
+        {isRename ? (
+          <>Rename <code className="text-emerald-400">{oldCode}</code> — old links stop working, share the new one.</>
+        ) : (
+          <>
+            Set a custom code like <code className="text-emerald-400">MYCODE</code> — then share{" "}
+            <code className="text-emerald-400">lastnotesold.com/MYCODE</code>
+            {codeLimit > 0 && (
+              <> — {remaining} of {codeLimit} {remaining === 1 ? "slot" : "slots"} left.</>
+            )}
+          </>
+        )}
       </p>
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder={currentCode}
+          placeholder={isRename ? oldCode : "MYCODE"}
           maxLength={20}
           className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 font-mono tracking-widest focus:border-emerald-500 focus:outline-none"
         />
@@ -60,7 +92,7 @@ function CustomCodeForm({ customerId, currentCode, onSaved }: {
           disabled={saving || !code.trim()}
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {saving ? "Saving..." : "Set Code"}
+          {saving ? "Saving..." : isRename ? "Rename" : "Add Code"}
         </button>
       </form>
       {message && (
@@ -76,39 +108,15 @@ export const Route = createFileRoute("/referrals")({
   component: ReferralsPage,
 });
 
-interface ReferralStats {
-  code: string;
-  clicks: number;
-  conversions: number;
-  earned: number;
-  monthlyConversions: number;
-  monthlyLimit: number;
-  remainingThisMonth: number;
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
-  };
-  return (
-    <button
-      onClick={copy}
-      className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
-    >
-      {copied ? "Copied!" : "Copy"}
-    </button>
-  );
-}
-
 function ReferralsPage() {
   const [customerId, setCustomerId] = useState<string | null>(null);
-  const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [codes, setCodes] = useState<CodeStat[]>([]);
+  const [tier, setTier] = useState("free");
+  const [codeLimit, setCodeLimit] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [pageMessage, setPageMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     const cid = document.cookie
@@ -118,45 +126,80 @@ function ReferralsPage() {
     setCustomerId(cid);
   }, []);
 
+  const loadStats = useCallback(async (cid: string) => {
+    try {
+      const r = await fetch(`/api/referral?customerId=${encodeURIComponent(cid)}&stats=true`);
+      const data = await r.json();
+      if (data.stats) {
+        const s = data.stats;
+        setCodes((s.codes || []).map((c: any) => ({
+          code: c.code || "",
+          clicks: c.clicks || 0,
+          conversions: c.conversions || 0,
+          earned: parseFloat(c.bountyEarnedDollars || "0"),
+          monthlyConversions: c.monthlyConversions || 0,
+          monthlyLimit: c.monthlyLimit || 20,
+          remainingThisMonth: c.remainingThisMonth || 0,
+        })));
+        setTier(s.tier || "free");
+        setCodeLimit(s.codeLimit || 0);
+        setError("");
+      } else if (data.error) {
+        setError(data.error);
+      }
+    } catch {
+      setError("Referral system is being set up — check back soon.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!customerId) {
       setLoading(false);
       return;
     }
+    loadStats(customerId);
+  }, [customerId, loadStats]);
 
-    fetch(`/api/referral?customerId=${customerId}&stats=true`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.stats) {
-          setStats({
-            code: data.stats.code || "",
-            clicks: data.stats.clicks || 0,
-            conversions: data.stats.conversions || 0,
-            earned: parseFloat(data.stats.bountyEarnedDollars || "0"),
-            monthlyConversions: data.stats.monthlyConversions || 0,
-            monthlyLimit: data.stats.monthlyLimit || 20,
-            remainingThisMonth: data.stats.remainingThisMonth || 0,
-          });
-        } else if (data.code) {
-          setStats({
-            code: data.code,
-            clicks: 0,
-            conversions: 0,
-            earned: 0,
-            monthlyConversions: 0,
-            monthlyLimit: 20,
-            remainingThisMonth: 20,
-          });
-        } else if (data.error) {
-          setError(data.error);
-        }
-      })
-      .catch(() => setError("Referral system is being set up — check back soon."))
-      .finally(() => setLoading(false));
-  }, [customerId]);
+  const handleDelete = async (code: string) => {
+    if (!window.confirm(`Delete referral code "${code}"? This cannot be undone.`)) return;
+    setPageMessage(null);
+    try {
+      const r = await fetch("/api/referral-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId, code }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        setPageMessage({ type: "success", text: `Code ${code} deleted.` });
+        setRenaming(null);
+        if (customerId) loadStats(customerId);
+      } else {
+        setPageMessage({ type: "error", text: data.error || "Failed to delete code." });
+      }
+    } catch {
+      setPageMessage({ type: "error", text: "Network error. Try again." });
+    }
+  };
 
-  const isSubscriber = stats !== null && !error;
+  const handleSaved = (newCode: string) => {
+    setRenaming(null);
+    setPageMessage({ type: "success", text: `Code ${newCode} saved.` });
+    if (customerId) loadStats(customerId);
+  };
+
+  // A subscriber is anyone with codes (legacy data) or an active Pro/Premier tier
+  const isSubscriber = codes.length > 0 || tier === "pro" || tier === "premier";
   const isLoggedIn = !!customerId;
+  const slotsRemaining = Math.max(0, codeLimit - codes.length);
+
+  // Aggregate totals across all codes
+  const totalClicks = codes.reduce((a, c) => a + c.clicks, 0);
+  const totalConversions = codes.reduce((a, c) => a + c.conversions, 0);
+  const totalEarned = codes.reduce((a, c) => a + c.earned, 0);
+  const totalRemaining = codes.reduce((a, c) => a + c.remainingThisMonth, 0);
 
   return (
     <div className="pt-16 sm:pt-20">
@@ -167,6 +210,7 @@ function ReferralsPage() {
           </h1>
           <p className="mt-4 text-base text-gray-400 sm:text-lg">
             Share LastNoteSold and earn $2 for Pro referrals and $5 for Premier referrals.
+            {tier === "premier" && <span className="block text-sm text-emerald-500 mt-1">Premier members get up to 3 referral codes.</span>}
           </p>
         </div>
       </section>
@@ -188,7 +232,7 @@ function ReferralsPage() {
             <ol className="space-y-3 text-sm text-gray-400">
               <li className="flex gap-3">
                 <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-900/50 text-xs font-bold text-emerald-400">1</span>
-                <span>Share your unique referral link with fellow banknote streamers and dealers.</span>
+                <span>Share your unique referral link(s) with fellow banknote streamers and dealers.</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-900/50 text-xs font-bold text-emerald-400">2</span>
@@ -196,6 +240,10 @@ function ReferralsPage() {
               </li>
               <li className="flex gap-3">
                 <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-900/50 text-xs font-bold text-emerald-400">3</span>
+                <span>Each code earns up to 20 conversions per month. Premier members can have up to 3 codes (60 conversions/month).</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-900/50 text-xs font-bold text-emerald-400">4</span>
                 <span>Bounties are tracked here and paid out by the LastNoteSold team.</span>
               </li>
             </ol>
@@ -204,41 +252,62 @@ function ReferralsPage() {
           {/* Subscriber with stats */}
           {!loading && isSubscriber && (
             <div className="space-y-8">
+              {pageMessage && (
+                <p className={`rounded-lg border px-4 py-2 text-sm ${pageMessage.type === "success" ? "border-green-900/50 bg-green-950/20 text-green-400" : "border-red-900/50 bg-red-950/20 text-red-400"}`}>
+                  {pageMessage.text}
+                </p>
+              )}
+
+              {/* Per-code cards */}
               <ReferralWidget
-                code={stats!.code}
-                conversions={stats!.conversions}
-                earned={stats!.earned}
-                monthlyConversions={stats!.monthlyConversions}
-                monthlyLimit={stats!.monthlyLimit}
-                remainingThisMonth={stats!.remainingThisMonth}
+                codes={codes}
+                codeLimit={codeLimit}
+                onDelete={handleDelete}
+                onRename={(code) => setRenaming(code)}
               />
 
-              <CustomCodeForm
-                customerId={customerId!}
-                currentCode={stats!.code}
-                onSaved={(newCode) => setStats({ ...stats!, code: newCode })}
-              />
+              {/* Rename form (when a card's Rename was clicked) */}
+              {renaming && (
+                <CustomCodeForm
+                  key={renaming}
+                  customerId={customerId!}
+                  oldCode={renaming}
+                  usedSlots={codes.length}
+                  codeLimit={codeLimit}
+                  onSaved={handleSaved}
+                />
+              )}
 
-              {/* Stats Cards */}
+              {/* Add-new form (when slots remain) */}
+              {!renaming && slotsRemaining > 0 && (
+                <CustomCodeForm
+                  customerId={customerId!}
+                  usedSlots={codes.length}
+                  codeLimit={codeLimit}
+                  onSaved={handleSaved}
+                />
+              )}
+
+              {/* Stats Cards — aggregate across all codes */}
               <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                 <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-4 sm:p-6 text-center">
                   <p className="text-2xl sm:text-3xl mb-2">👆</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-white">{stats!.clicks.toLocaleString()}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white">{totalClicks.toLocaleString()}</p>
                   <p className="mt-1 text-xs sm:text-sm text-gray-400">Total Clicks</p>
                 </div>
                 <div className="rounded-2xl border border-green-900/50 bg-green-950/20 p-4 sm:p-6 text-center">
                   <p className="text-2xl sm:text-3xl mb-2">✅</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-green-400">{stats!.conversions.toLocaleString()}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-green-400">{totalConversions.toLocaleString()}</p>
                   <p className="mt-1 text-xs sm:text-sm text-gray-400">Conversions</p>
                 </div>
                 <div className="rounded-2xl border border-emerald-800/30 bg-emerald-950/20 p-4 sm:p-6 text-center">
                   <p className="text-2xl sm:text-3xl mb-2">💰</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-emerald-400">${stats!.earned.toLocaleString()}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-400">${totalEarned.toLocaleString()}</p>
                   <p className="mt-1 text-xs sm:text-sm text-gray-400">Total Earned</p>
                 </div>
                 <div className="rounded-2xl border border-emerald-800/30 bg-emerald-950/20 p-4 sm:p-6 text-center">
                   <p className="text-2xl sm:text-3xl mb-2">📊</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-emerald-400">{stats!.remainingThisMonth}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-400">{totalRemaining}</p>
                   <p className="mt-1 text-xs sm:text-sm text-gray-400">Remaining This Month</p>
                 </div>
               </div>
