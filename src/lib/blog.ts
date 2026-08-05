@@ -42,16 +42,6 @@ async function ensureTable() {
   for (const p of seed) await exec("INSERT OR IGNORE INTO blog_posts (id,slug,title,description,category,read_time,image_url,body,published_at,featured) VALUES (?,?,?,?,?,?,?,?,?,?)", [p.id,p.slug,p.title,p.description,p.category,p.read_time,p.image_url || "",p.body,p.published_at,p.featured ? "1" : "0"]);
 }
 function map(row: Row): BlogPost { return { ...row, image_url: row.image_url || null, featured: Boolean(Number(row.featured)) }; }
-// Day-of-week filter: each series only shows on its scheduled day.
-// JS getDay(): 0=Sunday, 2=Tuesday, 4=Thursday. General/uncategorized shows every day.
-const DAY_MAP: Record<string, number> = { 'Noted': 0, 'Currency Currents': 2, 'Noteworthy Notes': 4 };
-function matchesToday(category: string): boolean {
-  if (category === 'General' || !DAY_MAP[category]) return true;
-  return new Date().getDay() === DAY_MAP[category];
-}
-
-function filterByDay(posts: BlogPost[]): BlogPost[] { return posts.filter(p => matchesToday(p.category)); }
-
-export async function getAllPosts() { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE published_at <= datetime('now') ORDER BY published_at DESC")).map(map)); }
-export async function getFeaturedPosts(limit = 2) { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE featured = 1 AND published_at <= datetime('now') ORDER BY published_at DESC LIMIT ?", [String(limit)])).map(map)); }
+export async function getAllPosts() { await ensureTable(); return (await query("SELECT * FROM blog_posts WHERE published_at <= datetime('now') ORDER BY published_at DESC")).map(map); }
+export async function getFeaturedPosts(limit = 2) { await ensureTable(); return (await query("SELECT * FROM blog_posts WHERE featured = 1 AND published_at <= datetime('now') ORDER BY published_at DESC LIMIT ?", [String(limit)])).map(map); }
 export async function getPostBySlug(slug: string) { await ensureTable(); const rows = await query("SELECT * FROM blog_posts WHERE slug = ? AND published_at <= datetime('now') LIMIT 1", [slug]); return rows[0] ? map(rows[0]) : null; }
