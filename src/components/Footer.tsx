@@ -29,6 +29,9 @@ export default function Footer() {
                 <a href="/pricing" className="transition-colors hover:text-emerald-400">Pricing</a>
               </li>
               <li>
+                <a href="/blog" className="transition-colors hover:text-emerald-400">Blog</a>
+              </li>
+              <li>
                 <a href="/referrals" className="transition-colors hover:text-emerald-400">Referrals</a>
               </li>
               <li>
