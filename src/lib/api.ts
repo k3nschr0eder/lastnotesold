@@ -148,12 +148,12 @@ export const lookupNote = createServerFn({ method: "POST" })
           sale_date: item.date,
           price: item.price,
           grade: item.grade,
-          auction_house: item.source === "CPG" ? "CPG Retail" : "Greysheet (CDN)",
+          auction_house: item.source === "CPG" ? "CPG Retail" : "Greensheet (CDN)",
           sale_url: item.listingUrl,
         }));
         greysheetResult = buildPriceResult(
-          "Greysheet CPG",
-          "CPG retail pricing from Greysheet — subscription required",
+          "Greensheet CPG",
+          "CPG retail pricing from Greensheet — subscription required",
           terms, sales, { skipTrim: true, maxRecentSales: 50 },
         );
         console.log(`[lookupNote] Greysheet comps_count: ${greysheetResult.comps_count}`);

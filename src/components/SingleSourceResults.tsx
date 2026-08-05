@@ -27,7 +27,7 @@ function sourceBadgeInfo(result: PriceResult): { label: string; color: string; i
   if (s.includes("sold") || s.includes("sold-comps")) {
     return { label: "eBay Sold Listings", color: "bg-green-900/60 text-green-300 border-green-700/50", icon: "💵" };
   }
-  if (s.includes("greysheet") || s.includes("cpg") || s.includes("retail")) {
+  if (s.includes("greensheet") || s.includes("cpg") || s.includes("retail")) {
     return { label: "Greensheet CPG", color: "bg-emerald-900/60 text-emerald-300 border-emerald-700/50", icon: "🏦" };
   }
   if (s.includes("ebay") || s.includes("active listing")) {
@@ -43,7 +43,7 @@ function sourceBadgeInfo(result: PriceResult): { label: string; color: string; i
 function priceHeadline(result: PriceResult, hasData: boolean): string {
   if (!hasData) return "No Comps Found";
   const s = result.source?.toLowerCase() || "";
-  if (s.includes("greysheet") || s.includes("cpg") || s.includes("retail")) return "Greensheet CPG";
+  if (s.includes("greensheet") || s.includes("cpg") || s.includes("retail")) return "Greensheet CPG";
   if (s.includes("sold") || s.includes("sold-comps")) return "Avg. Sold Price (eBay Listings)";
   if (s.includes("ebay") || s.includes("active")) return "Avg. Asking Price (Active Listings)";
   if (s.includes("historical") || s.includes("auction") || s.includes("database")) return "Average Last Sold Price";
@@ -70,7 +70,7 @@ function buildGradeRetailMap(sales: PriceResult["recent_sales"]): Map<string, nu
   for (const sale of sales) {
     const source = sale.source?.toLowerCase() || "";
     const norm = normalizeGrade(sale.grade);
-    if (!map.has(norm) && (source.includes("greysheet") || source.includes("cpg"))) {
+    if (!map.has(norm) && (source.includes("greensheet") || source.includes("cpg"))) {
       map.set(norm, sale.price);
     }
   }
@@ -98,7 +98,7 @@ export default function SingleSourceResults({ result }: SingleSourceResultsProps
   const badge = sourceBadgeInfo(result);
   const headlineLabel = priceHeadline(result, hasData);
 
-  const isGreensheet = result.source?.toLowerCase().includes("greysheet");
+  const isGreensheet = result.source?.toLowerCase().includes("greensheet");
 
   // Greensheet: build grade→retail map and filter to CPG_GRADES
   const gradeRetailMap = hasData && isGreensheet ? buildGradeRetailMap(result.recent_sales) : null;
