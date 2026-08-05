@@ -26,17 +26,18 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isAdmin = pathname.startsWith("/admin");
+  // Admin and OBS overlay pages run with no site chrome (Header/Footer).
+  const isBare = pathname.startsWith("/admin") || pathname.startsWith("/overlay/");
 
   return (
     <>
       <HeadContent />
       <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
-        {!isAdmin && <Header />}
+        {!isBare && <Header />}
         <main className="flex-1">
           <Outlet />
         </main>
-        {!isAdmin && <Footer />}
+        {!isBare && <Footer />}
       </div>
     </>
   );
