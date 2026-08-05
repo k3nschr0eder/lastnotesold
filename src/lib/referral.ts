@@ -2,7 +2,16 @@
  * Referral Lib — Turso DB access for referral codes and stats.
  *
  * Uses the same HTTP API pattern as referral-entry.mjs (Turso v2 pipeline).
+ * Mirrors the multi-code logic in referral-entry.mjs:
+ *   - Pro = 1 referral code, Premier = up to 3 (tier enforced via Stripe)
+ *   - 20 conversions/month per code
+ *   - Code deletion allowed only when the code has zero conversions
  */
+
+import { ALL_PRICE_IDS } from "~/lib/stripe";
+import type { TierName } from "~/lib/tiers";
+
+const MONTHLY_CONVERSION_LIMIT = 20;
 
 function getTursoConfig(): { url: string; token: string } | null {
   const dbUrl = process.env.TEAM_DB_URL;
@@ -116,51 +125,86 @@ async function runExec(sql: string, params: string[] = []): Promise<boolean> {
   }
 }
 
-/**
- * Get or create a referral code for a Stripe customer.
- * Works for both Pro and Premier subscribers.
- *
- * @param customerId — Stripe customer ID (e.g. "cus_xxx")
- * @returns { code, link } or null if referrals aren't available
- */
-export async function getOrCreateReferralCode(
-  customerId: string
-): Promise<{ code: string; link: string } | null> {
-  if (!getTursoConfig()) return null;
-
-  // Check if customer already has a code
-  const existing = await runQuery(
-    "SELECT code FROM referrals WHERE customer_id = ?",
-    [customerId]
-  );
-
-  let code: string;
-
-  if (existing.length === 0) {
-    // Generate a new random code
-    code =
-      "LNS-" +
-      Math.random().toString(36).substring(2, 6).toUpperCase() +
-      "-" +
-      Math.random().toString(36).substring(2, 6).toUpperCase();
-
-    await runExec(
-      "INSERT OR IGNORE INTO referrals (code, customer_id) VALUES (?, ?)",
-      [code, customerId]
-    );
-  } else {
-    code = existing[0]?.code || existing[0]?.["code"] || "";
-  }
-
-  if (!code) return null;
-
-  return {
-    code,
-    link: "https://www.lastnotesold.com/?ref=" + code,
-  };
+/** Code capacity by tier: Pro = 1, Premier = 3, Free = 0 (no referral program). */
+export function codeLimitForTier(tier: TierName): number {
+  if (tier === "premier") return 3;
+  if (tier === "pro") return 1;
+  return 0;
 }
 
-export interface ReferralStats {
+/**
+ * Determine the customer's subscription tier via the Stripe API.
+ * Price ID matching first (most reliable), product-name fallback for brand check.
+ * Fails closed to "free" (no code creation) when the lookup fails.
+ */
+export async function getCustomerTier(customerId: string): Promise<TierName> {
+  if (!customerId) return "free";
+  const key = process.env.STRIPE_SECRET_KEY || "";
+  if (!key) {
+    console.error("[Referral] STRIPE_SECRET_KEY is not set — tier enforcement will fail closed");
+    return "free";
+  }
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(
+      `https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=active&limit=1`,
+      { headers: { Authorization: "Basic " + btoa(key + ":") }, signal: ctrl.signal },
+    );
+    clearTimeout(timer);
+    const data = await res.json();
+    const sub = data.data?.[0];
+    if (!sub) return "free";
+
+    const item = sub.items?.data?.[0];
+    const priceId: string = item?.price?.id;
+    if ((ALL_PRICE_IDS.PREMIER as readonly string[]).includes(priceId)) return "premier";
+    if ((ALL_PRICE_IDS.PRO as readonly string[]).includes(priceId)) return "pro";
+
+    // Price ID not recognized — check the product name for brand
+    const productId: string = item?.price?.product;
+    if (productId && typeof productId === "string") {
+      try {
+        const prodRes = await fetch(`https://api.stripe.com/v1/products/${productId}`, {
+          headers: { Authorization: "Basic " + btoa(key + ":") },
+          signal: AbortSignal.timeout(5000),
+        });
+        const prod = await prodRes.json();
+        const productName = (prod.name || "").toLowerCase();
+        if (productName.includes("lastnotesold")) return "pro";
+      } catch (e) {
+        console.error("[Referral] Stripe product lookup failed:", e);
+      }
+    }
+    return "free";
+  } catch (e) {
+    console.error("[Referral] Tier lookup failed:", String((e as any)?.message || e).substring(0, 120));
+    return "free";
+  }
+}
+
+function linkForCode(code: string): string {
+  return "https://www.lastnotesold.com/" + code;
+}
+
+function isValidCode(code: string): boolean {
+  return /^[A-Z0-9][A-Z0-9-]{1,18}[A-Z0-9]$/.test(code);
+}
+
+export interface ReferralCodeRef {
+  code: string;
+  link: string;
+}
+
+export interface ReferralCodesResult {
+  codes: ReferralCodeRef[];
+  tier: TierName;
+  codeLimit: number;
+  /** Set when a requested set/rename failed (e.g. taken code, limit reached). */
+  error?: string;
+}
+
+export interface ReferralCodeStats {
   code: string;
   clicks: number;
   conversions: number;
@@ -170,61 +214,204 @@ export interface ReferralStats {
   remainingThisMonth: number;
 }
 
+export interface ReferralStatsResult {
+  tier: TierName;
+  codeLimit: number;
+  codes: ReferralCodeStats[];
+}
+
+export interface ReferralMutationResult {
+  success: boolean;
+  error?: string;
+  code?: string;
+  link?: string;
+}
+
 /**
- * Get referral stats for a Stripe customer.
+ * Get (or create) referral codes for a Stripe customer.
+ *
+ * Without a specific code, returns ALL codes for the customer (auto-creating the
+ * first one for eligible Pro/Premier subscribers). Pass `opts.code` to set/rename
+ * a custom code (with `opts.oldCode` targeting a specific row to rename).
  */
-export async function getReferralStats(
-  customerId: string
-): Promise<ReferralStats> {
-  const empty: ReferralStats = {
-    code: "",
-    clicks: 0,
-    conversions: 0,
-    bountyEarnedCents: 0,
-    monthlyConversions: 0,
-    monthlyLimit: 20,
-    remainingThisMonth: 20,
+export async function getOrCreateReferralCode(
+  customerId: string,
+  opts?: { code?: string; oldCode?: string }
+): Promise<ReferralCodesResult | null> {
+  if (!getTursoConfig()) return null;
+
+  const tier = await getCustomerTier(customerId);
+  const codeLimit = codeLimitForTier(tier);
+
+  // Fetch all codes for the customer (auto-creates the first for eligible subscribers).
+  const fetchCodes = async (): Promise<ReferralCodesResult> => {
+    const rows = await runQuery(
+      "SELECT code FROM referrals WHERE customer_id = ? ORDER BY id ASC",
+      [customerId]
+    );
+    let codeRows = rows;
+    if (codeRows.length === 0 && codeLimit > 0) {
+      const gen =
+        "LNS-" +
+        Math.random().toString(36).substring(2, 6).toUpperCase() +
+        "-" +
+        Math.random().toString(36).substring(2, 6).toUpperCase();
+      await runExec("INSERT OR IGNORE INTO referrals (code, customer_id) VALUES (?, ?)", [gen, customerId]);
+      codeRows = [{ code: gen }];
+    }
+    const codes = codeRows
+      .map((r) => r?.code || r?.["code"] || "")
+      .filter(Boolean)
+      .map((code) => ({ code, link: linkForCode(code) }));
+    return { codes, tier, codeLimit };
   };
+
+  const fail = async (error: string): Promise<ReferralCodesResult> => ({
+    ...(await fetchCodes()),
+    error,
+  });
+
+  // Set / rename a custom code
+  if (opts?.code) {
+    const trimmed = String(opts.code).trim().toUpperCase();
+    if (!isValidCode(trimmed)) {
+      return fail("Invalid code format. Use 3-20 letters, numbers, and hyphens.");
+    }
+    if (codeLimit === 0) {
+      return fail("Referral codes are only available for Pro and Premier subscribers.");
+    }
+    const existing = await runQuery("SELECT customer_id FROM referrals WHERE code = ?", [trimmed]);
+    if (existing.length > 0) {
+      const owner = existing[0]?.customer_id || existing[0]?.["customer_id"] || "";
+      if (owner !== customerId) {
+        return fail("That referral code is already taken. Try another.");
+      }
+      const oldTrimmed = opts.oldCode ? String(opts.oldCode).trim().toUpperCase() : "";
+      if (oldTrimmed !== trimmed) {
+        return fail("You already have that referral code.");
+      }
+    }
+    if (opts.oldCode) {
+      const oldTrimmed = String(opts.oldCode).trim().toUpperCase();
+      const row = await runQuery(
+        "SELECT code FROM referrals WHERE customer_id = ? AND code = ?",
+        [customerId, oldTrimmed]
+      );
+      if (row.length === 0) {
+        return fail("Referral code not found.");
+      }
+      await runExec(
+        "UPDATE referrals SET code = ? WHERE customer_id = ? AND code = ?",
+        [trimmed, customerId, oldTrimmed]
+      );
+    } else {
+      const count = await runQuery("SELECT COUNT(*) as c FROM referrals WHERE customer_id = ?", [customerId]);
+      const current = Number(count[0]?.c || count[0]?.["c"] || 0);
+      if (current >= codeLimit) {
+        return fail(`Referral code limit reached (${codeLimit}/${codeLimit}). Delete an unused code before adding another.`);
+      }
+      await runExec("INSERT OR IGNORE INTO referrals (code, customer_id) VALUES (?, ?)", [trimmed, customerId]);
+    }
+  }
+
+  return fetchCodes();
+}
+
+/**
+ * Delete a referral code. Allowed only when the code has zero conversions.
+ */
+export async function deleteReferralCode(
+  customerId: string,
+  code: string
+): Promise<ReferralMutationResult> {
+  if (!getTursoConfig()) return { success: false, error: "Referral system unavailable." };
+
+  const tier = await getCustomerTier(customerId);
+  if (codeLimitForTier(tier) === 0) {
+    return { success: false, error: "Referral codes are only available for Pro and Premier subscribers." };
+  }
+
+  const trimmed = String(code).trim().toUpperCase();
+  const owned = await runQuery(
+    "SELECT code FROM referrals WHERE customer_id = ? AND code = ?",
+    [customerId, trimmed]
+  );
+  if (owned.length === 0) {
+    return { success: false, error: "Referral code not found." };
+  }
+
+  const conv = await runQuery("SELECT COUNT(*) as c FROM referral_conversions WHERE code = ?", [trimmed]);
+  const convCount = Number(conv[0]?.c || conv[0]?.["c"] || 0);
+  if (convCount > 0) {
+    return { success: false, error: "You can't delete a referral code that already has conversions." };
+  }
+
+  const ok = await runExec("DELETE FROM referrals WHERE customer_id = ? AND code = ?", [customerId, trimmed]);
+  return ok ? { success: true, code: trimmed } : { success: false, error: "Delete failed. Try again." };
+}
+
+/**
+ * Get per-code referral stats for a Stripe customer.
+ */
+export async function getReferralStats(customerId: string): Promise<ReferralStatsResult> {
+  const empty: ReferralStatsResult = { tier: "free", codeLimit: 0, codes: [] };
 
   if (!getTursoConfig()) return empty;
 
-  const existing = await runQuery(
-    "SELECT code FROM referrals WHERE customer_id = ?",
+  const tier = await getCustomerTier(customerId);
+  const codeLimit = codeLimitForTier(tier);
+
+  let rows = await runQuery(
+    "SELECT code FROM referrals WHERE customer_id = ? ORDER BY id ASC",
     [customerId]
   );
-  const code = existing[0]?.code || existing[0]?.["code"] || "";
-  if (!code) return empty;
+  if (rows.length === 0 && codeLimit > 0) {
+    const gen =
+      "LNS-" +
+      Math.random().toString(36).substring(2, 6).toUpperCase() +
+      "-" +
+      Math.random().toString(36).substring(2, 6).toUpperCase();
+    await runExec("INSERT OR IGNORE INTO referrals (code, customer_id) VALUES (?, ?)", [gen, customerId]);
+    rows = [{ code: gen }];
+  }
 
-  const clicks = await runQuery(
-    "SELECT COUNT(*) as c FROM referral_clicks WHERE code = ?",
-    [code]
-  );
-  const conversions = await runQuery(
-    "SELECT COUNT(*) as c, COALESCE(SUM(bounty_amount_cents), 0) as total FROM referral_conversions WHERE code = ?",
-    [code]
-  );
-  const monthConversions = await runQuery(
-    "SELECT COUNT(*) as c FROM referral_conversions WHERE code = ? AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')",
-    [code]
-  );
+  const codes: ReferralCodeStats[] = [];
+  for (const row of rows) {
+    const code = row?.code || row?.["code"] || "";
+    if (!code) continue;
 
-  const clickCount = Number(clicks[0]?.c || clicks[0]?.["c"] || 0);
-  const convCount = Number(conversions[0]?.c || conversions[0]?.["c"] || 0);
-  const totalCents = Number(
-    conversions[0]?.total || conversions[0]?.["total"] || 0
-  );
-  const monthlyConvCount = Number(
-    monthConversions[0]?.c || monthConversions[0]?.["c"] || 0
-  );
-  const monthlyLimit = 20;
+    const clicks = await runQuery(
+      "SELECT COUNT(*) as c FROM referral_clicks WHERE code = ?",
+      [code]
+    );
+    const conversions = await runQuery(
+      "SELECT COUNT(*) as c, COALESCE(SUM(bounty_amount_cents), 0) as total FROM referral_conversions WHERE code = ?",
+      [code]
+    );
+    const monthConversions = await runQuery(
+      "SELECT COUNT(*) as c FROM referral_conversions WHERE code = ? AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')",
+      [code]
+    );
 
-  return {
-    code,
-    clicks: clickCount,
-    conversions: convCount,
-    bountyEarnedCents: totalCents,
-    monthlyConversions: monthlyConvCount,
-    monthlyLimit,
-    remainingThisMonth: Math.max(0, monthlyLimit - monthlyConvCount),
-  };
+    const clickCount = Number(clicks[0]?.c || clicks[0]?.["c"] || 0);
+    const convCount = Number(conversions[0]?.c || conversions[0]?.["c"] || 0);
+    const totalCents = Number(
+      conversions[0]?.total || conversions[0]?.["total"] || 0
+    );
+    const monthlyConvCount = Number(
+      monthConversions[0]?.c || monthConversions[0]?.["c"] || 0
+    );
+
+    codes.push({
+      code,
+      clicks: clickCount,
+      conversions: convCount,
+      bountyEarnedCents: totalCents,
+      monthlyConversions: monthlyConvCount,
+      monthlyLimit: MONTHLY_CONVERSION_LIMIT,
+      remainingThisMonth: Math.max(0, MONTHLY_CONVERSION_LIMIT - monthlyConvCount),
+    });
+  }
+
+  return { tier, codeLimit, codes };
 }
