@@ -248,11 +248,26 @@ function OverlayViewer() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const latestEventIdRef = useRef(0);
+  // Poll catch-up cursor — seeded from sessionStorage so the overlay never
+  // replays events from before this browser session. Fresh load starts at 0
+  // and replays the 5-min window; reloads resume from the last applied id.
+  const getInitialLatestId = () => {
+    try {
+      const stored = sessionStorage.getItem('lns_oe_latest_' + token);
+      return stored ? Math.max(0, parseInt(stored, 10) || 0) : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const latestEventIdRef = useRef(getInitialLatestId());
   const lastSearchIdRef = useRef(-1);
 
   const commitLatestId = (id: number) => {
-    if (id > latestEventIdRef.current) latestEventIdRef.current = id;
+    if (id > latestEventIdRef.current) {
+      latestEventIdRef.current = id;
+      try { sessionStorage.setItem('lns_oe_latest_' + token, String(id)); } catch {}
+    }
   };
 
   const shouldAccept = (evt: OverlayEvent): boolean => {
@@ -326,16 +341,17 @@ function OverlayViewer() {
       eventSource = es;
 
       es.addEventListener("connected", (e) => {
+        // Marker only — do NOT advance the poll cursor here.
+        // Cursor advances only from events actually applied.
         try {
-          const d = JSON.parse(e.data);
-          if (d.latestId) commitLatestId(d.latestId);
+          JSON.parse(e.data); // parse to validate, but ignore contents
         } catch {}
       });
 
       es.addEventListener("result", (e) => {
         try {
           const d = JSON.parse(e.data);
-          const evt = { id: parseInt(e.lastEventId, 10) || 0, ...d } as OverlayEvent;
+          const evt = { id: parseInt(e.lastEventId, 10) || 0, payload: d } as OverlayEvent;
           commitLatestId(evt.id);
           applyEvent(evt);
         } catch {}
@@ -366,7 +382,8 @@ function OverlayViewer() {
           commitLatestId(evt.id);
           applyEvent(evt);
         }
-        if (data.latestId != null) commitLatestId(data.latestId);
+        // Do NOT advance cursor from poll response metadata —
+        // only from events actually applied above.
       } catch {}
     };
 
