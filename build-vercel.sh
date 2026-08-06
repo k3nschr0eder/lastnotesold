@@ -790,7 +790,7 @@ export default async function handler(req, res) {
   };
   poll();
 }
-STREMEVEOF
+STREAMEVEOF
 
 cat > .vercel/output/functions/stream-events.func/.vc-config.json << 'JSON'
 { "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
