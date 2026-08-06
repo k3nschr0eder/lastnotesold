@@ -1,3 +1,5 @@
+import { createServerFn } from "@tanstack/react-start";
+
 export interface BlogPost {
   id: string;
   slug: string;
@@ -52,6 +54,18 @@ function matchesToday(category: string): boolean {
 
 function filterByDay(posts: BlogPost[]): BlogPost[] { return posts.filter(p => matchesToday(p.category)); }
 
-export async function getAllPosts() { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE published_at <= datetime('now') ORDER BY published_at DESC")).map(map)); }
-export async function getFeaturedPosts(limit = 2) { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE featured = 1 AND published_at <= datetime('now') ORDER BY published_at DESC LIMIT ?", [String(limit)])).map(map)); }
-export async function getPostBySlug(slug: string) { await ensureTable(); const rows = await query("SELECT * FROM blog_posts WHERE slug = ? AND published_at <= datetime('now') LIMIT 1", [slug]); return rows[0] ? map(rows[0]) : null; }
+async function queryAllPosts() { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE published_at <= datetime('now') ORDER BY published_at DESC")).map(map)); }
+async function queryFeaturedPosts(limit = 2) { await ensureTable(); return filterByDay((await query("SELECT * FROM blog_posts WHERE featured = 1 AND published_at <= datetime('now') ORDER BY published_at DESC LIMIT ?", [String(limit)])).map(map)); }
+async function queryPostBySlug(slug: string) { await ensureTable(); const rows = await query("SELECT * FROM blog_posts WHERE slug = ? AND published_at <= datetime('now') LIMIT 1", [slug]); return rows[0] ? map(rows[0]) : null; }
+
+// Server functions: run on the server (env vars available) so client-side
+// navigation can fetch blog data via RPC instead of querying the DB in the browser.
+export const getAllPosts = createServerFn({ method: "GET" })
+  .validator((d: unknown) => d as {})
+  .handler(async () => queryAllPosts());
+export const getFeaturedPosts = createServerFn({ method: "GET" })
+  .validator((d: unknown) => d as {})
+  .handler(async () => queryFeaturedPosts());
+export const getPostBySlug = createServerFn({ method: "GET" })
+  .validator((d: unknown) => d as { slug: string })
+  .handler(async ({ data }) => queryPostBySlug(data.slug));
