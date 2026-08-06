@@ -42,20 +42,20 @@ export default function Header() {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 border-b border-emerald-900/30 bg-gray-950/90 backdrop-blur-md transition-all duration-300 ${
-        scrolled ? "h-14 lg:h-16 shadow-lg shadow-black/20" : "h-16 lg:h-20"
+        scrolled ? "h-14 tblg:h-16 shadow-lg shadow-black/20" : "h-16 tblg:h-20"
       }`}
     >
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-3 lg:px-8">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-3 tblg:px-8">
         <Link to="/" className="flex items-center gap-2 shrink-0" onClick={closeMenu}>
           <img
             src="/LastNoteSoldLogo.png"
             alt="LastNoteSold"
-            className="h-8 md:h-10 lg:h-12 w-auto object-contain"
+            className="h-8 md:h-10 tblg:h-12 w-auto object-contain"
           />
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-5">
+        <nav className="hidden tblg:flex items-center gap-5">
           {navLinks.map((link) => (
             <Link
               key={link.to}
@@ -76,7 +76,7 @@ export default function Header() {
         {/* Mobile hamburger */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg text-gray-300 hover:text-emerald-400 transition-colors"
+          className="tblg:hidden flex items-center justify-center w-10 h-10 rounded-lg text-gray-300 hover:text-emerald-400 transition-colors"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
         >
           {menuOpen ? (
@@ -93,14 +93,14 @@ export default function Header() {
 
       {/* Mobile menu overlay */}
       {menuOpen && (
-        <div className="lg:hidden fixed inset-0 top-0 z-40">
+        <div className="tblg:hidden fixed inset-0 top-0 z-40">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={closeMenu}
           />
           {/* Menu panel */}
-          <nav className="absolute top-[calc(4rem+1px)] lg:top-[calc(5rem+1px)] left-0 right-0 bg-gray-950/95 backdrop-blur-md border-b border-emerald-900/30 shadow-2xl">
+          <nav className="absolute top-[calc(4rem+1px)] tblg:top-[calc(5rem+1px)] left-0 right-0 bg-gray-950/95 backdrop-blur-md border-b border-emerald-900/30 shadow-2xl">
             {navLinks.map((link, i) => (
               <Link
                 key={link.to}
