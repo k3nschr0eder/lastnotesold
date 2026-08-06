@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { getAllPosts, getFeaturedPosts, type BlogPost } from "~/lib/blog";
 
 export const Route = createFileRoute("/blog")({ loader: async () => ({ posts: await getAllPosts(), featured: await getFeaturedPosts() }), head: () => ({ meta: [{ title: "Blog - LastNoteSold" }, { name: "description", content: "Paper money collecting insights, market trends, and pricing tips from LastNoteSold." }] }), component: BlogPage });
