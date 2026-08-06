@@ -303,7 +303,8 @@ function OverlayViewer() {
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((e) => {
+        console.error("Overlay init fetch failed", e);
         if (!cancelled) {
           setNotFound(true);
           setLoading(false);
@@ -340,7 +341,9 @@ function OverlayViewer() {
         } catch {}
       });
 
-      es.onerror = () => {};
+      es.onerror = () => {
+        console.error("SSE connection error");
+      };
     };
 
     let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -352,6 +355,10 @@ function OverlayViewer() {
         const resp = await fetch(
           `/api/stream/events?token=${encodeURIComponent(token)}&poll=1&after=${after}`,
         );
+        if (!resp.ok) {
+          console.error("Poll failed", resp.status, await resp.text().catch(() => ""));
+          return;
+        }
         const data = await resp.json();
         const events: OverlayEvent[] = data.events || [];
         for (const evt of events) {
