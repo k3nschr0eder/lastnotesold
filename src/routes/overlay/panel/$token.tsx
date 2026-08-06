@@ -20,7 +20,7 @@ function unavailable(id: TabId, tier?: string) {
 function OverlayPanel() {
   const { token } = Route.useParams();
   const [overlay, setOverlay] = useState<OverlayRow | null>(null); const [query, setQuery] = useState(""); const [result, setResult] = useState<TabbedLookupResult | null>(null); const [active, setActive] = useState<TabId>("ebay"); const [busy, setBusy] = useState(false); const [status, setStatus] = useState("Connecting…"); const [message, setMessage] = useState("");
-  useEffect(() => { getOverlay({ data: { token } }).then(o => { if (o) { setOverlay(o); setQuery(o.query); setStatus("Connected"); } else setStatus("Overlay not found"); }).catch(() => setStatus("Unable to connect")); }, [token]);
+  useEffect(() => { getOverlay({ data: { token } }).then(o => { if (o?.overlay) { setOverlay(o.overlay); setQuery(o.overlay.query); setStatus("Connected"); } else setStatus("Overlay not found"); }).catch(() => setStatus("Unable to connect")); }, [token]);
   const search = async (e: React.FormEvent) => { e.preventDefault(); if (!query.trim()) return; setBusy(true); setMessage(""); try { const r = await lookupNote({ data: { query: query.trim(), fingerprint: overlay?.customerId || token } }) as TabbedLookupResult; setResult(r); setActive(r.ebay ? "ebay" : r.greysheet ? "greysheet" : "soldcomps"); } catch { setMessage("Search failed — try again."); } finally { setBusy(false); } };
   const push = () => { if (!result) return; const ch = new BroadcastChannel(`overlay-${token}`); ch.postMessage({ query: query.trim(), result }); ch.close(); setMessage("Pushed to overlay"); };
   const source: PriceResult | null = result?.[active] || null;
