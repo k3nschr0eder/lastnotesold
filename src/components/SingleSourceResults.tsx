@@ -1,25 +1,9 @@
 import type { PriceResult } from "~/lib/pricing-engine";
+import { CPG_GRADES, gradeBreakdown, normalizeGrade, averageForGrades, LOW_GRADES, MID_GRADES, HIGH_GRADES } from "~/lib/grading";
 
 interface SingleSourceResultsProps {
   result: PriceResult;
 }
-
-/** The only grades we show for Greensheet CPG (Paper Money scale) */
-const CPG_GRADES = [
-  "VG8", "F15", "VF30", "XF45", "AU55",
-  "AU58", "CU60", "CU63", "CU64", "GEM65",
-  "GEM66", "GEM67", "GEM68", "GEM69", "GEM70",
-];
-
-/** Normalize a grade string from the API to match our CPG_GRADES.
- *  Handles formats like "AG-3", "AG 3", "AG3", "MS-65", "MS 65", "MS65" */
-function normalizeGrade(grade: string): string {
-  return grade.replace(/[\s\-_]/g, "").toUpperCase();
-}
-
-const LOW_GRADES = CPG_GRADES.slice(0, 5);   // VG8 → AU55
-const MID_GRADES = CPG_GRADES.slice(5, 10);  // AU58 → GEM65
-const HIGH_GRADES = CPG_GRADES.slice(10);     // GEM66 → GEM70
 
 /** Return a color class for the source badge */
 function sourceBadgeInfo(result: PriceResult): { label: string; color: string; icon: string } {
@@ -50,49 +34,6 @@ function priceHeadline(result: PriceResult, hasData: boolean): string {
   return "Average Price";
 }
 
-/** Build a normalized grade→retail map from sales.
- *  Uses CPG retail prices when available, falls back to Greensheet retail prices. */
-function buildGradeRetailMap(sales: PriceResult["recent_sales"]): Map<string, number> {
-  const map = new Map<string, number>();
-  // First pass: collect CPG retail prices (preferred)
-  for (const sale of sales) {
-    const source = sale.source?.toLowerCase() || "";
-    if (source.includes("cpg")) {
-      const norm = normalizeGrade(sale.grade);
-      // Only set if not already set (first CPG price wins)
-      if (!map.has(norm)) {
-        map.set(norm, sale.price);
-      }
-    }
-  }
-  // Second pass: fill in missing grades from Greensheet retail prices
-  // (these are the best available proxy when no CPG retail exists)
-  for (const sale of sales) {
-    const source = sale.source?.toLowerCase() || "";
-    const norm = normalizeGrade(sale.grade);
-    if (!map.has(norm) && (source.includes("greensheet") || source.includes("cpg"))) {
-      map.set(norm, sale.price);
-    }
-  }
-  return map;
-}
-
-/** Average of retail prices for grades in the given list that have data. Returns null if none. */
-function averageForGrades(gradeMap: Map<string, number>, gradeList: string[]): number | null {
-  let sum = 0;
-  let count = 0;
-  for (const grade of gradeList) {
-    const norm = normalizeGrade(grade);
-    const price = gradeMap.get(norm);
-    if (price !== undefined && price > 0) {
-      sum += price;
-      count++;
-    }
-  }
-  if (count === 0) return null;
-  return Math.round((sum / count) * 100) / 100;
-}
-
 export default function SingleSourceResults({ result }: SingleSourceResultsProps) {
   const hasData = result.comps_count > 0;
   const badge = sourceBadgeInfo(result);
@@ -101,7 +42,7 @@ export default function SingleSourceResults({ result }: SingleSourceResultsProps
   const isGreensheet = result.source?.toLowerCase().includes("greensheet");
 
   // Greensheet: build grade→retail map and filter to CPG_GRADES
-  const gradeRetailMap = hasData && isGreensheet ? buildGradeRetailMap(result.recent_sales) : null;
+  const gradeRetailMap = hasData && isGreensheet ? gradeBreakdown(result).map : null;
   const greysheetRows = gradeRetailMap
     ? CPG_GRADES
         .map(grade => ({ grade, retail: gradeRetailMap.get(normalizeGrade(grade)) ?? 0 }))
