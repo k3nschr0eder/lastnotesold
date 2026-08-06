@@ -84,6 +84,19 @@ function OverlayViewer() {
     };
   }, [overlay]);
 
+  // Listen for live searches from the streamer control panel.
+  useEffect(() => {
+    if (!overlay || typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel(`overlay-${token}`);
+    channel.onmessage = (event) => {
+      if (event.data?.result) {
+        setResult(event.data.result as TabbedLookupResult);
+        setLastUpdated(new Date());
+        setOverlay((current) => current ? { ...current, query: event.data.query || current.query } : current);
+      }
+    };
+    return () => channel.close();
+  }, [overlay, token]);
   // Pick the best data source: real sold prices > dealer pricing > asking > fallback.
   const primary: PriceResult | null =
     result?.soldcomps || result?.greysheet || result?.ebay || result?.db || null;
@@ -166,7 +179,7 @@ function OverlayViewer() {
 
         {updatedLabel && (
           <p className="mt-6 text-[10px] uppercase tracking-widest text-gray-600">
-            {updatedLabel} · refreshes every 30s
+            {updatedLabel} · {lastUpdated ? "Live panel data" : "refreshes every 30s"}
           </p>
         )}
       </div>

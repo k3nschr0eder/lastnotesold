@@ -9,8 +9,7 @@ const navLinks = [
   { to: "/about", label: "About" },
   { to: "/blog", label: "Blog" },
   { to: "/referrals", label: "Referrals" },
-  { to: "/overlays", label: "Overlays" },
-  { to: "/dashboard", label: "Dashboard" },
+  { to: "/dashboard", label: "OBS Overlay", badge: "Premier" },
   { to: "/support", label: "Support" },
 ];
 
@@ -69,7 +68,7 @@ export default function Header() {
               }}
               className="text-sm font-medium transition-all duration-300"
             >
-              {link.label}
+              {link.label}{link.badge && <span className="ml-1 rounded bg-purple-900/60 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-purple-300">{link.badge}</span>}
             </Link>
           ))}
         </nav>
@@ -117,7 +116,7 @@ export default function Header() {
                   i < navLinks.length - 1 ? "border-b border-gray-800/50" : ""
                 }`}
               >
-                {link.label}
+                {link.label}{link.badge && <span className="ml-2 rounded bg-purple-900/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-purple-300">{link.badge}</span>}
               </Link>
             ))}
           </nav>
