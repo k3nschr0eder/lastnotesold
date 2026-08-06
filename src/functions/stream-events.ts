@@ -78,7 +78,7 @@ async function ensureOverlaysTable() {
 
 async function getOverlayByToken(token: string): Promise<OverlayRow | null> {
   const rows = await tursoQuery(
-    "SELECT id, token, customer_id, query FROM overlays WHERE token = ? AND is_active = 1 LIMIT 1",
+    "SELECT id, token, customer_id, query FROM overlays WHERE token = ? LIMIT 1",
     [token],
   );
   return (rows[0] as OverlayRow) || null;
@@ -186,7 +186,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // Also persist the latest query on the overlay row
     if (data.payload && typeof data.payload === "object" && "query" in (data.payload as any)) {
       try {
-        await tursoExec("UPDATE overlays SET query = ?, updated_at = datetime('now') WHERE token = ?",
+        await tursoExec("UPDATE overlays SET query = ? WHERE token = ?",
           [String((data.payload as any).query), token]);
       } catch {}
     }
