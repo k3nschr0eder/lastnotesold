@@ -63,6 +63,8 @@ function OverlayPanel() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Connecting…");
   const [message, setMessage] = useState("");
+  const [publishStatus, setPublishStatus] = useState<"idle" | "ok" | "fail">("idle");
+  const [publishDetail, setPublishDetail] = useState("");
   const searchSeqRef = useRef(0);
 
   useEffect(() => {
@@ -80,14 +82,26 @@ function OverlayPanel() {
   }, [token]);
 
   const publishToOverlay = async (q: string, r: TabbedLookupResult) => {
+    setPublishStatus("idle");
+    setPublishDetail("");
     try {
-      await fetch("/api/stream/events", {
+      const resp = await fetch("/api/stream/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, event_type: "result", payload: { query: q, result: r } }),
       });
-    } catch {
-      // Best-effort — SSE delivery may catch up via poll
+      if (resp.ok) {
+        setPublishStatus("ok");
+      } else {
+        const body = await resp.text().catch(() => "(unreadable)");
+        console.error("Publish failed", resp.status, body);
+        setPublishStatus("fail");
+        setPublishDetail(`HTTP ${resp.status}`);
+      }
+    } catch (e) {
+      console.error("Publish failed (network)", e);
+      setPublishStatus("fail");
+      setPublishDetail("network error");
     }
   };
 
@@ -204,6 +218,12 @@ function OverlayPanel() {
           </div>
         )}
 
+        {publishStatus === "ok" && (
+          <p className="mt-2 text-center text-xs text-emerald-500">Published ✓</p>
+        )}
+        {publishStatus === "fail" && (
+          <p className="mt-2 text-center text-xs text-red-400">Publish failed ({publishDetail || "unknown"})</p>
+        )}
         {message && (
           <p className="mt-4 text-center text-sm text-emerald-400">{message}</p>
         )}
