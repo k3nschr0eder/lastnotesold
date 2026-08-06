@@ -34,7 +34,7 @@ function CopyButton({ text }: { text: string }) {
       onClick={copy}
       className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
     >
-      {copied ? "Copied!" : "Copy"}
+      {copied ? "Copied!" : "Copy OBS URL"}
     </button>
   );
 }
@@ -318,19 +318,11 @@ function OverlaysPage() {
                             {deleting === o.token ? "Deleting..." : "Delete"}
                           </button>
                         </div>
-                        <div className="mt-3 flex items-center gap-2">
-                          <input
-                            readOnly
-                            value={url}
-                            onFocus={(e) => e.target.select()}
-                            className="flex-1 truncate rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 font-mono text-xs text-gray-300 focus:border-emerald-700 focus:outline-none"
-                          />
+                        <div className="mt-4 flex flex-wrap gap-2">
                           <CopyButton text={url} />
+                          <a href={`/overlay/panel/${o.token}`} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-950/50 transition-colors">Launch Panel ↗</a>
                         </div>
-                        <p className="mt-2 text-[11px] text-gray-500">
-                          In OBS: add a <span className="text-gray-300">Browser Source</span> → set URL above →
-                          width 800, height 300.
-                        </p>
+                        <p className="mt-2 text-[11px] text-gray-500">Add the OBS URL as a <span className="text-gray-300">Browser Source</span> (800 × 300 works well).</p>
                       </div>
                     );
                   })}

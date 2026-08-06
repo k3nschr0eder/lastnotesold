@@ -1,0 +1,15 @@
+import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { getOverlay } from "~/routes/api/-overlays";
+import { lookupNote } from "~/lib/api";
+import type { TabbedLookupResult } from "~/lib/api";
+import type { OverlayRow } from "~/lib/overlays";
+export const Route = createFileRoute("/overlay/panel/$token")({ component: OverlayPanel });
+function OverlayPanel() {
+ const { token } = Route.useParams(); const [overlay,setOverlay]=useState<OverlayRow|null>(null); const [query,setQuery]=useState(""); const [result,setResult]=useState<TabbedLookupResult|null>(null); const [busy,setBusy]=useState(false); const [status,setStatus]=useState("Connecting…"); const [message,setMessage]=useState("");
+ useEffect(()=>{getOverlay({data:{token}}).then(o=>{if(o){setOverlay(o);setQuery(o.query);setStatus("Connected")}else setStatus("Overlay not found")}).catch(()=>setStatus("Unable to connect"))},[token]);
+ const search=async(e:React.FormEvent)=>{e.preventDefault();if(!query.trim())return;setBusy(true);setMessage("");try{setResult(await lookupNote({data:{query:query.trim()}}) as TabbedLookupResult)}catch{setMessage("Search failed — try again.")}finally{setBusy(false)}};
+ const primary=result?.soldcomps||result?.greysheet||result?.ebay||result?.db;
+ const push=()=>{if(!result)return;const ch=new BroadcastChannel(`overlay-${token}`);ch.postMessage({query:query.trim(),result});ch.close();setMessage("Pushed to overlay")};
+ return <main className="min-h-screen bg-gray-950 px-4 py-8 text-gray-100 sm:px-8"><div className="mx-auto max-w-2xl"><div className="mb-8 flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-emerald-400">OBS Overlay Panel</p><h1 className="mt-2 text-2xl font-black sm:text-3xl">{overlay?.query||"Loading overlay…"}</h1></div><span className="rounded-full border border-emerald-800 bg-emerald-950/50 px-3 py-1 text-xs font-semibold text-emerald-400">● {status}</span></div><form onSubmit={search} className="flex gap-2"><input value={query} onChange={e=>setQuery(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-white outline-none focus:border-emerald-500" placeholder="Search a banknote…"/><button disabled={busy} className="rounded-xl bg-emerald-500 px-5 font-bold text-gray-950 disabled:opacity-50">{busy?"Searching…":"Search"}</button></form>{primary&&<section className="mt-6 rounded-2xl border border-gray-800 bg-gray-900 p-6"><p className="text-sm text-gray-400">{primary.source}</p><p className="mt-2 text-5xl font-black text-emerald-400">${(primary.avg_price||primary.median_price).toLocaleString(undefined,{maximumFractionDigits:0})}</p><p className="mt-2 text-sm text-gray-400">{primary.comps_count} comparable listings</p><button onClick={push} className="mt-6 w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white">Push to Overlay</button></section>}{message&&<p className="mt-4 text-center text-sm text-emerald-400">{message}</p>}<p className="mt-8 text-center text-xs text-gray-600">Keep this panel open while OBS is live.</p></div></main>
+}

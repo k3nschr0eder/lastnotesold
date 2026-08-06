@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
-    title: "Dashboard - LastNoteSold",
+    title: "OBS Overlay - LastNoteSold",
     meta: [
       { name: "description", content: "Manage your LastNoteSold overlays, referrals, and account links." },
     ],
@@ -62,7 +62,7 @@ function DashboardPage() {
     <div className="pt-16 sm:pt-20">
       <section className="border-b border-emerald-900/20 bg-gray-900/30 py-12 sm:py-16">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-extrabold text-white sm:text-5xl">Dashboard</h1>
+          <h1 className="text-3xl font-extrabold text-white sm:text-5xl">OBS Overlay</h1>
           <p className="mt-4 text-base text-gray-400 sm:text-lg">Your LastNoteSold tools and account shortcuts.</p>
         </div>
       </section>

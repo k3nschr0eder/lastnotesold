@@ -35,7 +35,7 @@ export default function Footer() {
                 <a href="/referrals" className="transition-colors hover:text-emerald-400">Referrals</a>
               </li>
               <li>
-                <a href="/dashboard" className="transition-colors hover:text-emerald-400">Dashboard</a>
+                <a href="/dashboard" className="transition-colors hover:text-emerald-400">OBS Overlay</a>
               </li>
               <li>
                 <a href="/support" className="transition-colors hover:text-emerald-400">Support</a>
