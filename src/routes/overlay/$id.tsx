@@ -247,6 +247,18 @@ function OverlayViewer() {
   const [active, setActive] = useState<TabId>("ebay");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  // Display mode — initialized to "box" for SSR/hydration match, then applied from
+  // URL param in useEffect (mirrors LCS pattern). This avoids hydration mismatch.
+  const [displayMode, setDisplayMode] = useState<"box" | "thin-line" | "text-only">("box");
+  // Apply URL displayMode param after hydration — avoids SSR/client mismatch
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get("displayMode");
+      if (p === "thin-line" || p === "text-only" || p === "box") {
+        setDisplayMode(p);
+      }
+    } catch {}
+  }, []);
 
   // Poll catch-up cursor — seeded from sessionStorage so the overlay never
   // replays events from before this browser session. Fresh load starts at 0
@@ -344,7 +356,15 @@ function OverlayViewer() {
         // Marker only — do NOT advance the poll cursor here.
         // Cursor advances only from events actually applied.
         try {
-          JSON.parse(e.data); // parse to validate, but ignore contents
+          const data = JSON.parse(e.data);
+          // Apply displayMode from config if URL didn't explicitly set one
+          if (data?.config?.displayMode) {
+            const dm = data.config.displayMode;
+            if ((dm === "thin-line" || dm === "text-only" || dm === "box") &&
+                !new URLSearchParams(window.location.search).has("displayMode")) {
+              setDisplayMode(dm);
+            }
+          }
         } catch {}
       });
 
@@ -382,6 +402,14 @@ function OverlayViewer() {
           commitLatestId(evt.id);
           applyEvent(evt);
         }
+        // Apply displayMode from poll config if URL didn't set one
+        if (data.config?.displayMode) {
+          const dm = data.config.displayMode;
+          if ((dm === "thin-line" || dm === "text-only" || dm === "box") &&
+              !new URLSearchParams(window.location.search).has("displayMode")) {
+            setDisplayMode(dm);
+          }
+        }
         // Do NOT advance cursor from poll response metadata —
         // only from events actually applied above.
       } catch {}
@@ -397,10 +425,14 @@ function OverlayViewer() {
     };
   }, [token]);
 
+  const displayModeClass = `obs-overlay dm-${displayMode}`;
+  const isTop = displayMode === "thin-line" ? "dm-thin-line-top" : "";
+
   if (notFound) {
     return (
       <div
-        className="flex h-screen items-center justify-center p-8"
+        className={`${displayModeClass} ${isTop} flex h-screen items-center justify-center p-8`}
+        data-display-mode={displayMode}
         style={{ background: "var(--ov-bg)", fontFamily: "'Inter', system-ui, sans-serif" }}
       >
         <div className="rounded-2xl p-8 text-center"
@@ -420,13 +452,59 @@ function OverlayViewer() {
 
   return (
     <div
-      className="flex min-h-screen flex-col p-6"
+      className={`${displayModeClass} ${isTop} flex min-h-screen flex-col p-6`}
+      data-display-mode={displayMode}
       style={{
         background: "var(--ov-bg)",
         fontFamily: "'Inter', system-ui, sans-serif",
         color: "var(--ov-text)",
       }}
     >
+      <style>{`
+        html, body, #root {
+          margin: 0; padding: 0; overflow: hidden;
+          background: transparent !important;
+          cursor: none; user-select: none; -webkit-user-select: none;
+        }
+        .obs-overlay.dm-box {
+          position: fixed; inset: 0;
+          display: flex; align-items: flex-end; justify-content: flex-end;
+          padding: 24px; pointer-events: none;
+          font-family: 'Inter', system-ui, sans-serif;
+        }
+        .obs-overlay.dm-thin-line {
+          position: fixed; left: 0; right: 0; bottom: 0;
+          display: flex; align-items: center; justify-content: center;
+          padding: 6px 16px; pointer-events: none;
+          font-family: 'Inter', system-ui, sans-serif;
+          background: var(--ov-bg); min-height: 36px; z-index: 9999;
+        }
+        .obs-overlay.dm-thin-line.dm-thin-line-top { bottom: auto; top: 0; }
+        .obs-overlay.dm-text-only {
+          position: fixed; right: 24px; bottom: 24px;
+          pointer-events: none;
+          font-family: 'Inter', system-ui, sans-serif; text-align: right;
+        }
+        .obs-overlay.dm-thin-line .ov-disconnected,
+        .obs-overlay.dm-thin-line .ov-searching,
+        .obs-overlay.dm-thin-line .ov-error {
+          background: none; border: none; border-radius: 0;
+          padding: 0; animation: none;
+        }
+        .obs-overlay.dm-text-only .ov-disconnected,
+        .obs-overlay.dm-text-only .ov-searching,
+        .obs-overlay.dm-text-only .ov-error,
+        .obs-overlay.dm-text-only .ov-result-card {
+          background: none !important; border: none !important;
+          border-radius: 0 !important; padding: 0 !important;
+          backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+          min-width: auto !important;
+        }
+        .obs-overlay.dm-thin-line .ov-searching,
+        .obs-overlay.dm-text-only .ov-searching {
+          flex-direction: row; align-items: center; gap: 8px;
+        }
+      `}</style>
       {query && (
         <div className="mb-4">
           <h2
