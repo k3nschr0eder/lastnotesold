@@ -161,6 +161,81 @@ const CATEGORY_KEYWORDS: Record<string, { nodeIds: number[]; keyword: string }> 
   "north africa":          { nodeIds: [16005], keyword: "north africa" },
 };
 
+// ─── Size classification ────────────────────────────────────────────────
+// Currency changed from Large Size to Small Size in 1928.
+// A 1963 note is always small; an 1863 note is always large.
+const SMALL_SIZE_CUTOFF_YEAR = 1928;
+
+/** CPG leaf node IDs for Small Size notes. */
+const SMALL_SIZE_NODE_IDS = new Set([
+  9211, // Legal Tender - Small
+  9213, // Silver Certificates - Small
+  9215, // Gold Certificates - Small
+  9217, // National Bank Notes - Small
+  9219, // Federal Reserve Notes - Small
+  9221, // Federal Reserve Bank Notes - Small
+  9222, // Hawaii - Small
+  16005, // North Africa - Small
+  // Additional FRN sub-series (small-size era)
+  15187, 9650, 9651, 9652, 9653, 9654, 9655, 9656, 9657, 9658,
+  // Additional NBN sub-series (small-size era)
+  9337, 9766, 9767, 9768,
+]);
+
+/** CPG leaf node IDs for Large Size notes. */
+const LARGE_SIZE_NODE_IDS = new Set([
+  9210, // Legal Tender - Large
+  9212, // Silver Certificates - Large
+  9214, // Gold Certificates - Large
+  9216, // National Bank Notes - Large
+  9218, // Federal Reserve Notes - Large
+  9220, // Federal Reserve Bank Notes - Large
+  9223, // Treasury Notes - Large
+  9225, // Refunding Certificates - Large
+  9226, // Demand Notes - Large
+  9306, // Compound Interest - Large
+]);
+
+function isSmallSizeNode(nodeId: number): boolean {
+  return SMALL_SIZE_NODE_IDS.has(nodeId);
+}
+
+function isLargeSizeNode(nodeId: number): boolean {
+  return LARGE_SIZE_NODE_IDS.has(nodeId);
+}
+
+/**
+ * Parse a denomination value from a query string.
+ * Returns the numeric denomination (e.g. 1, 2, 5, 10, 20, 50, 100) or null.
+ */
+function parseDenominationFromQuery(query: string): number | null {
+  const match = query.match(/\$(\d+)\b/);
+  if (match) return parseInt(match[1], 10);
+  // Word forms
+  if (/\b(one|1)\s+dollar\b/i.test(query)) return 1;
+  if (/\b(two|2)\s+dollar\b/i.test(query)) return 2;
+  if (/\b(five|5)\s+dollar\b/i.test(query)) return 5;
+  if (/\b(ten|10)\s+dollar\b/i.test(query)) return 10;
+  if (/\b(twenty|20)\s+dollar\b/i.test(query)) return 20;
+  if (/\b(fifty|50)\s+dollar\b/i.test(query)) return 50;
+  if (/\b(one hundred|hundred|100)\s+dollar\b/i.test(query)) return 100;
+  return null;
+}
+
+/**
+ * Check if a collectible name plausibly matches the queried denomination.
+ * Returns true if:
+ * - No denomination was parsed from the query (skip check), OR
+ * - The collectible name contains the same $N denomination string
+ */
+function denominationPlausible(collectibleName: string, queryDenom: number | null): boolean {
+  if (queryDenom === null) return true; // No denomination in query — skip
+  const name = collectibleName.toLowerCase();
+  return name.includes(`${queryDenom}`) ||
+    name.includes(`${queryDenom} dollar`) ||
+    name.includes(`${queryDenom} dollars`);
+}
+
 /** 
  * Fallback nodes for paper money: search ALL known leaf-level category nodes.
  * Container nodes (8197, 8217) return 0 collectibles via GetCollectibleByNodeRequest,
@@ -206,9 +281,11 @@ async function findGsId(query: string): Promise<{ gsid: number; name: string } |
   const searchTerm = query.toLowerCase().trim();
   if (!searchTerm) return null;
 
-  // Try direct PCGS Number lookup — if query looks like a number, try it
+  // Parse year and denomination from the query
   const yearMatch = searchTerm.match(/\b(18\d{2}|19\d{2}|20\d{2})\b/);
   const year = yearMatch ? yearMatch[1] : null;
+  const yearNum = year ? parseInt(year, 10) : null;
+  const queryDenom = parseDenominationFromQuery(searchTerm);
 
   // Find which category nodes this note belongs to
   let targetNodeIds: number[] = [];
@@ -223,16 +300,37 @@ async function findGsId(query: string): Promise<{ gsid: number; name: string } |
     }
   }
 
-  // Candidate nodes: specific matched nodes first, then paper money fallbacks.
-  // For keyword-matched searches, search ALL target nodes (don't break on
-  // first with data — a query like "red seal" matches both Large and Small
-  // nodes, and the note might only be in Small). For fallback searches,
-  // collect from all leaf nodes but stop early once we have enough data.
+  // ── Size-aware node ordering ──────────────────────────────────────────
+  // When the query has a year, reorder candidate nodes so that
+  // the correct size (small/large) is tried FIRST.
   const hasSpecificMatch = targetNodeIds.length > 0;
-  const candidateNodes: number[] = [...targetNodeIds];
+  let candidateNodes: number[] = [...targetNodeIds];
+
   if (!hasSpecificMatch) {
     for (const fn of PAPER_MONEY_FALLBACK_NODES) {
       if (!candidateNodes.includes(fn)) candidateNodes.push(fn);
+    }
+  }
+
+  // Reorder: size-appropriate nodes first, then the rest in original order
+  if (yearNum !== null && hasSpecificMatch) {
+    const preferSmall = yearNum >= SMALL_SIZE_CUTOFF_YEAR;
+    const preferred: number[] = [];
+    const other: number[] = [];
+    for (const nid of candidateNodes) {
+      if (preferSmall) {
+        if (isSmallSizeNode(nid)) preferred.push(nid);
+        else other.push(nid);
+      } else {
+        if (isLargeSizeNode(nid)) preferred.push(nid);
+        else other.push(nid);
+      }
+    }
+    candidateNodes = [...preferred, ...other];
+    if (preferSmall) {
+      console.log(`[Greysheet] Year ${year} >= ${SMALL_SIZE_CUTOFF_YEAR} — trying SMALL-size nodes first`);
+    } else {
+      console.log(`[Greysheet] Year ${year} < ${SMALL_SIZE_CUTOFF_YEAR} — trying LARGE-size nodes first`);
     }
   }
 
@@ -280,6 +378,11 @@ async function findGsId(query: string): Promise<{ gsid: number; name: string } |
     const name = (c.Name || "").toLowerCase();
     let score = 0;
 
+    // HARD year constraint: if query has a year, skip collectibles that don't
+    // contain that exact year in their name. Year-mismatched notes (e.g. 1863
+    // when querying 1963) should never win.
+    if (year && !name.includes(year)) continue;
+
     // Exact match wins
     if (name === searchTerm) score = 100;
     // Contains the full search query
@@ -297,10 +400,12 @@ async function findGsId(query: string): Promise<{ gsid: number; name: string } |
       score = (matches / queryWords.length) * 60;
     }
 
-    // Bonus for matching the year
+    // Bonus for matching the year (already filtered above; here as boost)
     if (year && name.includes(year)) score += 15;
     // Bonus for matching keyword in name
     if (matchedKeyword && name.includes(matchedKeyword)) score += 10;
+    // Denomination anchor: bonus for including the queried $N in name
+    if (queryDenom !== null && denominationPlausible(name, queryDenom)) score += 10;
 
     if (score > 0 && (!bestMatch || score > bestMatch.score)) {
       bestMatch = { gsid: c.Gsid, name: c.Name, score };
@@ -312,9 +417,25 @@ async function findGsId(query: string): Promise<{ gsid: number; name: string } |
     return { gsid: bestMatch.gsid, name: bestMatch.name };
   }
 
-  // Fallback: return the first result if there's only one
+  // ── Fallback: single collectible — GATED by year/size plausibility ───
+  // A single result must match the query's year and denomination context.
+  // A 1963 query must never resolve to an 1863 large-size collectible.
   if (collectibles.length === 1) {
     const c = collectibles[0];
+    const cName = (c.Name || "").toLowerCase();
+    
+    // Year plausibility: if query has year, collectible must contain it
+    if (year && !cName.includes(year)) {
+      console.log(`[Greysheet] Single collectible "${c.Name}" rejected — year mismatch (query has ${year})`);
+      return null;
+    }
+    
+    // Denomination plausibility
+    if (queryDenom !== null && !denominationPlausible(cName, queryDenom)) {
+      console.log(`[Greysheet] Single collectible "${c.Name}" rejected — denomination mismatch (query has ${queryDenom})`);
+      return null;
+    }
+    
     console.log(`[Greysheet] Single collectible: "${c.Name}" (Gsid=${c.Gsid})`);
     return { gsid: c.Gsid, name: c.Name };
   }
