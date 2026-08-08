@@ -10,23 +10,78 @@ import appCss from "~/styles/app.css?url";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 
+const SITE_URL = "https://www.lastnotesold.com";
+const OG_IMAGE = `${SITE_URL}/LastNoteSoldLogo.png`;
+const SITE_TITLE = "LastNoteSold — Real-Time Paper Money Pricing for Live Streamers";
+const SITE_DESC =
+  "Instant paper money pricing from Greensheet CPG and eBay. Built for Whatnot, TikTok Live, and eBay Live streamers.";
+
 export const Route = createRootRoute({
   head: () => ({
-    title: "LastNoteSold — Real-Time Paper Money Pricing for Live Streamers",
+    title: SITE_TITLE,
     meta: [
+      { charSet: "utf-8" },
       {
         name: "viewport",
         content: "width=device-width, initial-scale=1.0, viewport-fit=cover",
       },
-      {
-        name: "description",
-        content:
-          "Instant paper money pricing from Greensheet CPG and eBay. Built for Whatnot, TikTok Live, and eBay Live streamers.",
-      },
+      { name: "description", content: SITE_DESC },
+      { name: "robots", content: "index, follow" },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:title", content: SITE_TITLE },
+      { property: "og:description", content: SITE_DESC },
+      { property: "og:image", content: OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:site_name", content: "LastNoteSold" },
+      { property: "og:locale", content: "en_US" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: SITE_TITLE },
+      { name: "twitter:description", content: SITE_DESC },
+      { name: "twitter:image", content: OG_IMAGE },
+      { name: "twitter:site", content: "@lastnotesold" },
     ],
     links: [
+      { rel: "canonical", href: SITE_URL },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "LastNoteSold",
+          url: SITE_URL,
+          logo: OG_IMAGE,
+          description: SITE_DESC,
+          foundingDate: "2025",
+          founder: {
+            "@type": "Organization",
+            name: "SixPackSouth, LLC",
+          },
+          sameAs: ["https://twitter.com/lastnotesold"],
+        }),
+      },
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "LastNoteSold",
+          url: SITE_URL,
+          potentialAction: {
+            "@type": "SearchAction",
+            target: {
+              "@type": "EntryPoint",
+              urlTemplate: `${SITE_URL}/?q={search_term_string}`,
+            },
+            "query-input": "required name=search_term_string",
+          },
+        }),
+      },
     ],
   }),
   component: RootComponent,

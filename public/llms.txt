@@ -1,0 +1,24 @@
+# LastNoteSold
+
+Real-time paper money and currency pricing for live streamers on Whatnot, TikTok Live,
+and eBay Live. Get reliable comps from Greensheet CPG dealer pricing, eBay sold prices,
+and active listings — all in one search. Free to start.
+
+## Key pages
+
+- [Home](https://www.lastnotesold.com/): Search for paper money and currency prices by series, type, and grade.
+- [Pricing](https://www.lastnotesold.com/pricing): Free, Pro, and Premier plans for live streamers.
+- [Blog](https://www.lastnotesold.com/blog): Paper money collecting insights, market trends, and pricing tips.
+- [Overlays](https://www.lastnotesold.com/overlays): OBS overlay for live stream pricing display (Premier tier).
+
+## Blog articles
+
+- [What Makes the 1928 $2 Red Seal So Collectible?](https://www.lastnotesold.com/blog/what-makes-the-1928-2-red-seal-so-collectible): A closer look at the history, scarcity, and details that make this classic United States Note a collector favorite.
+- [Paper Money Market Trends: What's Hot in 2026](https://www.lastnotesold.com/blog/paper-money-market-trends-whats-hot-in-2026): From affordable small-size notes to high-grade rarities, the categories getting attention.
+- [The Great Debate: Grading Paper Money — Is It Worth It?](https://www.lastnotesold.com/blog/the-great-debate-grading-paper-money-is-it-worth-it): Professional grading can protect a note, but it is not the right choice for every piece.
+
+## Tools
+
+- Paper money / currency price lookup with multi-source data (eBay, Greensheet CPG, Sold Comps)
+- OBS overlay for live stream pricing display (Premier tier)
+- Grade-by-grade pricing breakdowns for major US currency types
