@@ -10,6 +10,16 @@ import type { PriceResult } from "~/lib/pricing-engine";
 import type { TierName } from "~/lib/tiers";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    title: "LastNoteSold — Real-Time Paper Money Pricing for Live Streamers",
+    meta: [
+      {
+        name: "description",
+        content:
+          "Instant paper money pricing from Greensheet CPG and eBay. Built for Whatnot, TikTok Live, and eBay Live streamers.",
+      },
+    ],
+  }),
   component: Home,
 });
 
