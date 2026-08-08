@@ -124,6 +124,7 @@ const CATEGORY_KEYWORDS: Record<string, { nodeIds: number[]; keyword: string }> 
   "gold certificate":      { nodeIds: [9214, 9215], keyword: "gold certificate" },
   "legal tender":          { nodeIds: [9210, 9211], keyword: "legal tender" },
   "federal reserve note":  { nodeIds: [9218, 9219, 15187, 9650, 9651, 9652, 9653, 9654, 9655, 9656, 9657, 9658], keyword: "federal reserve note" },
+  "frn":                   { nodeIds: [9218, 9219, 15187, 9650, 9651, 9652, 9653, 9654, 9655, 9656, 9657, 9658], keyword: "federal reserve note" },
   "national bank note":    { nodeIds: [9337, 9216, 9767, 9768, 9217, 9766], keyword: "national bank note" },
   "federal reserve bank":  { nodeIds: [9220, 9221], keyword: "federal reserve bank" },
 
