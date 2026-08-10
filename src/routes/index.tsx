@@ -16,7 +16,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Instant paper money pricing from Greensheet CPG and eBay. Built for Whatnot, TikTok Live, and eBay Live streamers.",
+          "Instant paper money pricing from CPG Price and eBay. Built for Whatnot, TikTok Live, and eBay Live streamers.",
       },
     ],
   }),
@@ -32,7 +32,7 @@ const features = [
   },
   {
     icon: "🏦",
-    title: "Greensheet Dealer Pricing",
+    title: "CPG Price",
     description:
       "Industry-standard CPG retail values by grade. Retail pricing for every major US banknote type.",
   },
@@ -83,7 +83,7 @@ const tiers = [
     description: "For streamers who need dealer pricing data.",
     features: [
       "Unlimited lookups",
-      "eBay Active + Greensheet CPG (20 comps)",
+      "eBay Active + CPG Price (20 comps)",
       "Grade-by-grade retail pricing",
     ],
     cta: "Subscribe",
@@ -96,7 +96,7 @@ const tiers = [
     description: "All three data sources — real sold prices.",
     features: [
       "Unlimited lookups",
-      "eBay Active + Greensheet + Sold Comps (20 each)",
+      "eBay Active + CPG Price + Sold Comps (20 each)",
       "Real eBay sold prices",
       "Priority support",
     ],

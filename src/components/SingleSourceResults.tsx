@@ -3,6 +3,21 @@ import { CPG_GRADES, gradeBreakdown, normalizeGrade, averageForGrades, LOW_GRADE
 
 interface SingleSourceResultsProps {
   result: PriceResult;
+  gsid?: number;
+  /** CPG catalog Name of the matched note — the greysheet.com slug MUST derive from this, never the search query (ToS §4.4). */
+  coinName?: string;
+}
+
+/**
+ * slugify a coin/note catalog Name for the greysheet.com per-coin URL (ToS §4.4).
+ * Slug is cosmetic — GSID is canonical — but must be Name-derived.
+ * "1928 $2 Legal Tender" → "1928-2-legal-tender"
+ */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /** Return a color class for the source badge */
@@ -12,7 +27,7 @@ function sourceBadgeInfo(result: PriceResult): { label: string; color: string; i
     return { label: "eBay Sold Listings", color: "bg-green-900/60 text-green-300 border-green-700/50", icon: "💵" };
   }
   if (s.includes("greensheet") || s.includes("cpg") || s.includes("retail")) {
-    return { label: "Greensheet CPG", color: "bg-emerald-900/60 text-emerald-300 border-emerald-700/50", icon: "🏦" };
+    return { label: "CPG Price", color: "bg-emerald-900/60 text-emerald-300 border-emerald-700/50", icon: "🏦" };
   }
   if (s.includes("ebay") || s.includes("active listing")) {
     return { label: "eBay Active Listings", color: "bg-blue-900/60 text-blue-300 border-blue-700/50", icon: "🛒" };
@@ -27,14 +42,14 @@ function sourceBadgeInfo(result: PriceResult): { label: string; color: string; i
 function priceHeadline(result: PriceResult, hasData: boolean): string {
   if (!hasData) return "No Comps Found";
   const s = result.source?.toLowerCase() || "";
-  if (s.includes("greensheet") || s.includes("cpg") || s.includes("retail")) return "Greensheet CPG";
+  if (s.includes("greensheet") || s.includes("cpg") || s.includes("retail")) return "CPG Price";
   if (s.includes("sold") || s.includes("sold-comps")) return "Avg. Sold Price (eBay Listings)";
   if (s.includes("ebay") || s.includes("active")) return "Avg. Asking Price (Active Listings)";
   if (s.includes("historical") || s.includes("auction") || s.includes("database")) return "Average Last Sold Price";
   return "Average Price";
 }
 
-export default function SingleSourceResults({ result }: SingleSourceResultsProps) {
+export default function SingleSourceResults({ result, gsid, coinName }: SingleSourceResultsProps) {
   const hasData = result.comps_count > 0;
   const badge = sourceBadgeInfo(result);
   const headlineLabel = priceHeadline(result, hasData);
@@ -69,6 +84,26 @@ export default function SingleSourceResults({ result }: SingleSourceResultsProps
           {badge.label}
         </span>
       </div>
+
+      {/* Per-coin Greysheet link (GSID-based, ToS §4.1/§4.4) */}
+      {isGreensheet && hasData && (
+        <div className="mb-6 flex justify-center">
+          <a
+            href={gsid && coinName
+              ? `https://www.greysheet.com/prices/item/${slugify(coinName)}/gsid/${gsid}`
+              : "https://www.greysheet.com"
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors"
+          >
+            View on Greysheet
+            <svg className="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+      )}
 
       {/* ── Greensheet: just the three grade-tier averages (no headline price) ── */}
       {hasData && isGreensheet && (
@@ -255,6 +290,17 @@ export default function SingleSourceResults({ result }: SingleSourceResultsProps
               </table>
             </div>
           </div>
+        </div>
+      )}
+      {/* CDN attribution (ToS §4.5) */}
+      {isGreensheet && hasData && (
+        <div className="mt-6 text-center">
+          <p className="text-xs text-gray-500">
+            Pricing data provided by{" "}
+            <a href="https://www.greysheet.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">
+              CDN Publishing / Greysheet
+            </a>
+          </p>
         </div>
       )}
     </div>
