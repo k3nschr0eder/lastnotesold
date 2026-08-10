@@ -36,6 +36,8 @@ export interface TabbedLookupResult {
   tier?: "free" | "pro" | "premier";
   freeLookupsRemaining?: number;
   error?: string;
+  /** CPG GSID for per-coin Greysheet link */
+  greysheet_gsid?: number;
 }
 
 /** Build a PriceResult (with source/note) from sales data. */
@@ -102,7 +104,12 @@ export const lookupNote = createServerFn({ method: "POST" })
       ]);
 
       const ebayItemsRaw = results[0].status === "fulfilled" ? results[0].value : [];
-      const greysheetItems = results[1].status === "fulfilled" ? results[1].value : [];
+      const greysheetItems = results[1].status === "fulfilled"
+        ? (() => { const r = results[1].value as any; return r.items || r || []; })()
+        : [];
+      const greysheetGsid: number | undefined = results[1].status === "fulfilled"
+        ? (results[1].value as any).gsid
+        : undefined;
       const soldCompsItems = results[2].status === "fulfilled" ? results[2].value : [];
 
       if (results[2].status === "rejected") {
@@ -243,6 +250,7 @@ export const lookupNote = createServerFn({ method: "POST" })
         db: dbResult,
         tier: tierConfig.tier,
         freeLookupsRemaining: tierConfig.freeLookupsRemaining,
+        greysheet_gsid: greysheetGsid,
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

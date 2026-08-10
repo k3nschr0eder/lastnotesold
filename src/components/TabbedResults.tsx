@@ -56,7 +56,7 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
   if (isEntitled) {
     const message =
       tabId === "greysheet"
-        ? "Greensheet CPG data is currently unavailable. This may be a temporary issue — please try again or contact support."
+        ? "CPG Price data is currently unavailable. This may be a temporary issue — please try again or contact support."
         : "Sold Comps data is currently unavailable. This may be a temporary issue — please try again or contact support.";
 
     return (
@@ -64,7 +64,7 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
         <div className="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 sm:p-12">
           <p className="text-3xl sm:text-4xl mb-4">{tabId === "greysheet" ? "🏦" : "💵"}</p>
           <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
-            {tabId === "greysheet" ? "Greensheet CPG" : "Sold Comps"}
+            {tabId === "greysheet" ? "CPG Price" : "Sold Comps"}
           </h3>
           <p className="text-gray-400 text-sm max-w-md mx-auto">{message}</p>
         </div>
@@ -76,10 +76,10 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
   const config =
     tabId === "greysheet"
       ? {
-          title: "Greensheet CPG",
+          title: "CPG Price",
           icon: "🏦",
           message:
-            "Greensheet CPG data requires a Pro or Premier subscription. Upgrade to see retail pricing by grade.",
+            "CPG Price data requires a Pro or Premier subscription. Upgrade to see retail pricing by grade.",
         }
       : {
           title: "Sold Comps",
@@ -111,7 +111,7 @@ function PlaceholderCard({ tabId, tier }: { tabId: string; tier?: TierName }) {
 export default function TabbedResults({ result, tier }: TabbedResultsProps) {
   const tabs: SourceTab[] = [
     { id: "ebay", label: "eBay Active", data: result.ebay, icon: "🛒" },
-    { id: "greysheet", label: "Greensheet CPG", data: result.greysheet, icon: "🏦" },
+    { id: "greysheet", label: "CPG Price", data: result.greysheet, icon: "🏦" },
     { id: "soldcomps", label: "Sold Comps", data: result.soldcomps, icon: "💵" },
   ];
 
@@ -168,7 +168,7 @@ export default function TabbedResults({ result, tier }: TabbedResultsProps) {
 
       {/* Active source content — null guard: never pass null to SingleSourceResults */}
       {activeSource.data ? (
-        <SingleSourceResults result={activeSource.data} />
+        <SingleSourceResults result={activeSource.data} query={query} gsid={result.greysheet_gsid} />
       ) : (
         <PlaceholderCard tabId={activeSource.id} tier={tier} />
       )}
