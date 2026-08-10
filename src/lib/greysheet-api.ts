@@ -29,6 +29,13 @@ export interface GreysheetItem {
 
 const API_BASE = "https://cpgpublicapiv2.greysheet.com/api";
 
+/**
+ * Greysheet ToS §4.3: wholesale (GreyVal) requires CDN's prior written
+ * permission for public display. Owner has none (8/10). Flip to true ONLY
+ * after written permission is granted.
+ */
+const ALLOW_WHOLESALE_DISPLAY = false;
+
 function getApiKey(): string {
   return process.env.GREYSHEET_API_KEY || "";
 }
@@ -496,7 +503,7 @@ function parsePricingResponse(data: any, query: string): GreysheetItem[] {
       const ngcVal = parsePriceString(p.NgcVal);
       const bbVal = parsePriceString(p.BlueBookVal);
 
-      if (greyVal > 0) {
+      if (ALLOW_WHOLESALE_DISPLAY && greyVal > 0) {
         items.push({
           title: name,
           price: greyVal,
