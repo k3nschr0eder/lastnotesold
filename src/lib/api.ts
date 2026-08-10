@@ -36,8 +36,10 @@ export interface TabbedLookupResult {
   tier?: "free" | "pro" | "premier";
   freeLookupsRemaining?: number;
   error?: string;
-  /** CPG GSID for per-coin Greysheet link */
+  /** CPG GSID for per-coin Greysheet link (ToS §4.4) */
   greysheet_gsid?: number;
+  /** CPG catalog Name — slug for the per-coin Greysheet link MUST derive from this, never the search query (ToS §4.4). */
+  greysheet_name?: string;
 }
 
 /** Build a PriceResult (with source/note) from sales data. */
@@ -109,6 +111,9 @@ export const lookupNote = createServerFn({ method: "POST" })
         : [];
       const greysheetGsid: number | undefined = results[1].status === "fulfilled"
         ? (results[1].value as any).gsid
+        : undefined;
+      const greysheetName: string | undefined = results[1].status === "fulfilled"
+        ? (results[1].value as any).name
         : undefined;
       const soldCompsItems = results[2].status === "fulfilled" ? results[2].value : [];
 
@@ -251,6 +256,7 @@ export const lookupNote = createServerFn({ method: "POST" })
         tier: tierConfig.tier,
         freeLookupsRemaining: tierConfig.freeLookupsRemaining,
         greysheet_gsid: greysheetGsid,
+        greysheet_name: greysheetName,
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

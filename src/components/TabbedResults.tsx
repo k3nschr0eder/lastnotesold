@@ -168,7 +168,7 @@ export default function TabbedResults({ result, tier }: TabbedResultsProps) {
 
       {/* Active source content — null guard: never pass null to SingleSourceResults */}
       {activeSource.data ? (
-        <SingleSourceResults result={activeSource.data} query={query} gsid={result.greysheet_gsid} />
+        <SingleSourceResults result={activeSource.data} gsid={result.greysheet_gsid} coinName={result.greysheet_name} />
       ) : (
         <PlaceholderCard tabId={activeSource.id} tier={tier} />
       )}

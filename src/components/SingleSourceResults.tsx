@@ -3,8 +3,21 @@ import { CPG_GRADES, gradeBreakdown, normalizeGrade, averageForGrades, LOW_GRADE
 
 interface SingleSourceResultsProps {
   result: PriceResult;
-  query: string;
   gsid?: number;
+  /** CPG catalog Name of the matched note — the greysheet.com slug MUST derive from this, never the search query (ToS §4.4). */
+  coinName?: string;
+}
+
+/**
+ * slugify a coin/note catalog Name for the greysheet.com per-coin URL (ToS §4.4).
+ * Slug is cosmetic — GSID is canonical — but must be Name-derived.
+ * "1928 $2 Legal Tender" → "1928-2-legal-tender"
+ */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /** Return a color class for the source badge */
@@ -36,7 +49,7 @@ function priceHeadline(result: PriceResult, hasData: boolean): string {
   return "Average Price";
 }
 
-export default function SingleSourceResults({ result, query, gsid }: SingleSourceResultsProps) {
+export default function SingleSourceResults({ result, gsid, coinName }: SingleSourceResultsProps) {
   const hasData = result.comps_count > 0;
   const badge = sourceBadgeInfo(result);
   const headlineLabel = priceHeadline(result, hasData);
@@ -76,8 +89,8 @@ export default function SingleSourceResults({ result, query, gsid }: SingleSourc
       {isGreensheet && hasData && (
         <div className="mb-6 flex justify-center">
           <a
-            href={gsid
-              ? `https://www.greysheet.com/prices/item/${encodeURIComponent(query.replace(/\s+/g, '-').toLowerCase())}/gsid/${gsid}`
+            href={gsid && coinName
+              ? `https://www.greysheet.com/prices/item/${slugify(coinName)}/gsid/${gsid}`
               : "https://www.greysheet.com"
             }
             target="_blank"

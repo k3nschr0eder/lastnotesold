@@ -582,7 +582,7 @@ export async function getCollectiblesByCategory(nodeId: number): Promise<Collect
  * @param query - Note name (e.g. "1928 $2 Red Seal")
  * @returns Structured pricing items with source attribution
  */
-export async function searchGreysheet(query: string): Promise<{ items: GreysheetItem[]; gsid?: number }> {
+export async function searchGreysheet(query: string): Promise<{ items: GreysheetItem[]; gsid?: number; name?: string }> {
   if (!hasCredentials()) {
     console.log("[Greysheet] GREYSHEET_API_KEY and GREYSHEET_API_TOKEN not configured");
     return { items: [] };
@@ -602,12 +602,12 @@ export async function searchGreysheet(query: string): Promise<{ items: Greysheet
 
   if (!data) {
     console.log("[Greysheet] No pricing data returned");
-    return { items: [], gsid: found.gsid };
+    return { items: [], gsid: found.gsid, name: found.name };
   }
 
   const items = parsePricingResponse(data, found.name);
   console.log(`[Greysheet] Found ${items.length} pricing entries`);
-  return { items, gsid: found.gsid };
+  return { items, gsid: found.gsid, name: found.name };
 }
 
 /**
