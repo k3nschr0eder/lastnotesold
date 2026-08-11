@@ -75,6 +75,11 @@ export default function SingleSourceResults({ result, gsid, coinName }: SingleSo
     ? Math.round((tierAvgs.reduce((s, v) => s + v, 0) / tierAvgs.length) * 100) / 100
     : null;
 
+  // Per-note Greysheet URL (GSID-based, ToS §4.4): every displayed CPG value links here.
+  const greysheetUrl = gsid && coinName
+    ? `https://www.greysheet.com/prices/item/${slugify(coinName)}/gsid/${gsid}`
+    : "https://www.greysheet.com";
+
   return (
     <div className="animate-fade-in">
       {/* Source badge */}
@@ -89,10 +94,7 @@ export default function SingleSourceResults({ result, gsid, coinName }: SingleSo
       {isGreensheet && hasData && (
         <div className="mb-6 flex justify-center">
           <a
-            href={gsid && coinName
-              ? `https://www.greysheet.com/prices/item/${slugify(coinName)}/gsid/${gsid}`
-              : "https://www.greysheet.com"
-            }
+            href={greysheetUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors"
@@ -111,21 +113,33 @@ export default function SingleSourceResults({ result, gsid, coinName }: SingleSo
           <div className="rounded-xl border border-gray-800 bg-gray-900/80 p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Low Grade Avg</p>
             <p className="mt-1 text-2xl font-bold text-gray-200">
-              {lowAvg !== null ? `$${lowAvg.toLocaleString()}` : "\u2014"}
+              {lowAvg !== null ? (
+                <a href={greysheetUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 transition-colors hover:text-emerald-300">
+                  {`$${lowAvg.toLocaleString()}`}
+                </a>
+              ) : "\u2014"}
             </p>
             <p className="text-xs text-gray-500">VG8 - AU55</p>
           </div>
           <div className="rounded-xl border border-gray-800 bg-gray-900/80 p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Mid-Grade Avg</p>
             <p className="mt-1 text-2xl font-bold text-gray-200">
-              {midAvg !== null ? `$${midAvg.toLocaleString()}` : "\u2014"}
+              {midAvg !== null ? (
+                <a href={greysheetUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 transition-colors hover:text-emerald-300">
+                  {`$${midAvg.toLocaleString()}`}
+                </a>
+              ) : "\u2014"}
             </p>
             <p className="text-xs text-gray-500">AU58 - GEM65</p>
           </div>
           <div className="rounded-xl border border-gray-800 bg-gray-900/80 p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">High Grade Avg</p>
             <p className="mt-1 text-2xl font-bold text-gray-200">
-              {highAvg !== null ? `$${highAvg.toLocaleString()}` : "\u2014"}
+              {highAvg !== null ? (
+                <a href={greysheetUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 transition-colors hover:text-emerald-300">
+                  {`$${highAvg.toLocaleString()}`}
+                </a>
+              ) : "\u2014"}
             </p>
             <p className="text-xs text-gray-500">GEM66 - GEM70</p>
           </div>
@@ -211,7 +225,9 @@ export default function SingleSourceResults({ result, gsid, coinName }: SingleSo
                         </span>
                       </td>
                       <td className="px-5 py-4 font-bold text-emerald-400">
-                        ${row.retail.toLocaleString()}
+                        <a href={greysheetUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 transition-colors hover:text-emerald-300">
+                          ${row.retail.toLocaleString()}
+                        </a>
                       </td>
                     </tr>
                   ))}
