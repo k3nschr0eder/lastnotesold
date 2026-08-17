@@ -2,6 +2,7 @@ import { useState } from "react";
 
 export interface ReferralCodeData {
   code: string;
+  active?: boolean;
   conversions?: number;
   earned?: number;
   monthlyConversions?: number;
@@ -17,18 +18,27 @@ interface ReferralWidgetProps {
   onDelete?: (code: string) => void;
   /** Called with the code when the user clicks Rename. */
   onRename?: (code: string) => void;
+  /** Called with the code when the user clicks Re-activate (inactive codes only). */
+  onActivate?: (code: string) => void;
+  /** Called with the code when the user clicks Deactivate (active codes only). */
+  onDeactivate?: (code: string) => void;
 }
 
 function CodeCard({
   data,
   onDelete,
   onRename,
+  onActivate,
+  onDeactivate,
 }: {
   data: ReferralCodeData;
   onDelete?: (code: string) => void;
   onRename?: (code: string) => void;
+  onActivate?: (code: string) => void;
+  onDeactivate?: (code: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const isActive = data.active !== false;
   const referralLink = `https://lastnotesold.com/${data.code}`;
   const handleCopy = async () => {
     try {
@@ -100,8 +110,29 @@ function CodeCard({
         </div>
       </div>
 
-      {(onRename || (onDelete && canDelete)) && (
+      {!isActive && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-800 pt-3">
+          <span className="text-xs font-medium text-amber-400">⏸ Inactive — no longer accepting referrals</span>
+          {onActivate && (
+            <button
+              onClick={() => onActivate(data.code)}
+              className="rounded-lg border border-emerald-700 bg-emerald-900/30 px-3 py-1.5 text-sm font-medium text-emerald-400 hover:bg-emerald-800/40 transition-colors"
+            >
+              Re-activate
+            </button>
+          )}
+        </div>
+      )}
+      {(onRename || onDeactivate || (onDelete && canDelete)) && (
         <div className="mt-3 flex gap-2 border-t border-gray-800 pt-3">
+          {isActive && onDeactivate && (
+            <button
+              onClick={() => onDeactivate(data.code)}
+              className="rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-900/40 transition-colors"
+            >
+              Deactivate
+            </button>
+          )}
           {onRename && (
             <button
               onClick={() => onRename(data.code)}
@@ -135,6 +166,8 @@ export default function ReferralWidget({
   compact = false,
   onDelete,
   onRename,
+  onActivate,
+  onDeactivate,
 }: ReferralWidgetProps) {
   if (compact) {
     return (
@@ -174,7 +207,7 @@ export default function ReferralWidget({
         </div>
       )}
       {codes.map((c) => (
-        <CodeCard key={c.code} data={c} onDelete={onDelete} onRename={onRename} />
+        <CodeCard key={c.code} data={c} onDelete={onDelete} onRename={onRename} onActivate={onActivate} onDeactivate={onDeactivate} />
       ))}
     </div>
   );
