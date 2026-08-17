@@ -65,7 +65,21 @@ function OverlayPanel() {
   const [message, setMessage] = useState("");
   const [publishStatus, setPublishStatus] = useState<"idle" | "ok" | "fail">("idle");
   const [publishDetail, setPublishDetail] = useState("");
+  const [showList, setShowList] = useState<string[]>([]);
+  const [showListDraft, setShowListDraft] = useState("");
+  const [lastClicked, setLastClicked] = useState<number | null>(null);
   const searchSeqRef = useRef(0);
+  const SHOWLIST_KEY = `lsc-showlist-${token}`;
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SHOWLIST_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setShowList(parsed.map((s) => String(s)).filter(Boolean).slice(0, 100));
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [SHOWLIST_KEY]);
 
   useEffect(() => {
     getOverlay({ data: { token } })
@@ -105,8 +119,8 @@ function OverlayPanel() {
     }
   };
 
-  const search = async () => {
-    const q = query.trim();
+  const search = async (qOverride?: string) => {
+    const q = (qOverride ?? query).trim();
     if (!q || q.length < 3) {
       setMessage("Enter at least 3 characters to search.");
       return;
@@ -136,6 +150,38 @@ function OverlayPanel() {
     }
   };
 
+  const persistShowList = (next: string[]) => {
+    const clamped = next.slice(0, 100);
+    setShowList(clamped);
+    try {
+      window.localStorage.setItem(SHOWLIST_KEY, JSON.stringify(clamped));
+    } catch {}
+  };
+  const handleAddShowList = () => {
+    const entries = showListDraft
+      .split(/\r?\n/)
+      .map((s) => s.trim().slice(0, 140))
+      .filter(Boolean)
+      .slice(0, 100);
+    if (!entries.length) return;
+    persistShowList([...showList, ...entries]);
+    setShowListDraft("");
+  };
+  const handleRemoveShowList = (i: number) => {
+    persistShowList(showList.filter((_, idx) => idx !== i));
+  };
+  const handleMoveShowList = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= showList.length) return;
+    const next = [...showList];
+    [next[i], next[j]] = [next[j], next[i]];
+    persistShowList(next);
+  };
+  const handleClickEntry = (entry: string, i: number) => {
+    setLastClicked(i);
+    setQuery(entry);
+    search(entry);
+  };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -172,12 +218,97 @@ function OverlayPanel() {
           />
           <button
             disabled={busy || query.trim().length < 3}
-            onClick={search}
+            onClick={() => search()}
             className="rounded-xl bg-emerald-500 px-5 font-bold text-gray-950 disabled:opacity-50"
           >
             {busy ? "Searching…" : "Search"}
           </button>
         </div>
+
+        <section className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/60 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-400">Show List</h2>
+            <span className="text-xs text-gray-500">{showList.length}/100</span>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Pre-load your lineup before the show — click a note anytime to search it and push it to the overlay.
+          </p>
+          <textarea
+            rows={2}
+            value={showListDraft}
+            onChange={(e) => setShowListDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleAddShowList();
+              }
+            }}
+            placeholder={"One note per line — e.g.\n1928 $2 Legal Tender\n1953B $5 Silver Certificate"}
+            className="mt-3 w-full resize-y rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+          />
+          <button
+            onClick={handleAddShowList}
+            disabled={!showListDraft.trim()}
+            className="mt-2 rounded-lg bg-emerald-500 px-4 py-1.5 text-sm font-bold text-gray-950 disabled:opacity-40"
+          >
+            Add to Show List
+          </button>
+          {showList.length > 0 ? (
+            <ol className="mt-3 flex flex-col gap-1.5">
+              {showList.map((entry, i) => (
+                <li
+                  key={`${i}-${entry}`}
+                  className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 ${
+                    lastClicked === i
+                      ? "border-emerald-500 bg-emerald-900/40"
+                      : "border-gray-800 bg-gray-950/60"
+                  }`}
+                >
+                  <button
+                    onClick={() => handleClickEntry(entry, i)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    title="Click to search and push to the overlay"
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-800 text-[11px] font-bold text-emerald-400">
+                      {i + 1}
+                    </span>
+                    <span className="truncate text-sm text-gray-200">{entry}</span>
+                    {lastClicked === i && (
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-emerald-400">last</span>
+                    )}
+                  </button>
+                  <span className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      disabled={i === 0}
+                      onClick={() => handleMoveShowList(i, -1)}
+                      title="Move up"
+                      className="rounded px-1.5 text-gray-400 hover:text-white disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      disabled={i === showList.length - 1}
+                      onClick={() => handleMoveShowList(i, 1)}
+                      title="Move down"
+                      className="rounded px-1.5 text-gray-400 hover:text-white disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      onClick={() => handleRemoveShowList(i)}
+                      title="Remove"
+                      className="rounded px-1.5 text-gray-400 hover:text-red-400"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-3 text-xs text-gray-600">No notes queued yet — add your lineup before the show.</p>
+          )}
+        </section>
 
         {result && (
           <>
