@@ -89,6 +89,20 @@ export default async function handler(req, res) {
   };
 
   const hasDB = !!(TURSO_URL && TURSO_TOKEN);
+  // Ensure the referrals table has the active column (soft-deactivate support).
+  let activeColumnChecked = false;
+  const ensureActiveColumn = async () => {
+    if (activeColumnChecked) return;
+    try {
+      const info = await runQuery("PRAGMA table_info(referrals)");
+      if (!info.some((r) => (r.name || "") === "active")) {
+        await runExec("ALTER TABLE referrals ADD COLUMN active INTEGER DEFAULT 1");
+      }
+    } catch (e) {
+      console.error("[Referral] ensureActiveColumn failed:", String(e.message || e).substring(0, 120));
+    }
+    activeColumnChecked = true;
+  };
 
   // Read body helper
   const readBody = () => new Promise((resolve, reject) => {
@@ -164,7 +178,7 @@ export default async function handler(req, res) {
   };
 
   const getCustomerCodes = async (customerId) =>
-    runQuery("SELECT code FROM referrals WHERE customer_id = ? ORDER BY id ASC", [customerId]);
+    runQuery("SELECT code, active FROM referrals WHERE customer_id = ? ORDER BY id ASC", [customerId]);
 
   const generateCode = () =>
     "LNS-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -221,6 +235,15 @@ export default async function handler(req, res) {
         res.end(JSON.stringify({ error: "Missing code" }));
         return;
       }
+      await ensureActiveColumn();
+      // Only record clicks for ACTIVE codes — deactivated codes stop tracking
+      const act = await runQuery("SELECT 1 FROM referrals WHERE code = ? AND active = 1", [String(code).toUpperCase()]);
+      if (act.length === 0) {
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ recorded: false, reason: "Inactive referral code" }));
+        return;
+      }
       await runExec("INSERT INTO referral_clicks (code) VALUES (?)", [code]);
       res.statusCode = 200;
       res.setHeader("content-type", "application/json");
@@ -275,6 +298,15 @@ export default async function handler(req, res) {
         return;
       }
 
+      await ensureActiveColumn();
+      // Only attribute ACTIVE codes — deactivated codes stop conversions/bounties
+      const actConv = await runQuery("SELECT 1 FROM referrals WHERE code = ? AND active = 1", [String(code).toUpperCase()]);
+      if (actConv.length === 0) {
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ recorded: false, reason: "Inactive referral code" }));
+        return;
+      }
       const amount = Number(bountyAmountCents) || 500;
       // NOTE: live schema column is referred_customer_id (NOT stripe_customer_id) and it is
       // UNIQUE NOT NULL — use a unique fallback when the caller doesn't pass a Stripe customer.
@@ -383,7 +415,7 @@ export default async function handler(req, res) {
   if (url.includes("/api/referral") && req.method === "POST") {
     try {
       const body = await readBody();
-      const { customerId, code, oldCode } = JSON.parse(body || "{}");
+      const { customerId, code, oldCode, action } = JSON.parse(body || "{}");
 
       if (!customerId || !code) {
         res.statusCode = 400;
@@ -396,6 +428,63 @@ export default async function handler(req, res) {
         res.statusCode = 200;
         res.setHeader("content-type", "application/json");
         res.end(JSON.stringify({ error: "Referral system initializing — check back soon." }));
+        return;
+      }
+      await ensureActiveColumn();
+      // ── "deactivate" action: soft-deactivate the code (stops new referrals) ──
+      if (action === "deactivate") {
+        const trimmed = String(code).trim().toUpperCase();
+        const owned = await runQuery("SELECT customer_id, active FROM referrals WHERE code = ?", [trimmed]);
+        if (owned.length === 0) {
+          res.statusCode = 404;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: "Referral code not found." }));
+          return;
+        }
+        if (owned[0].customer_id !== customerId) {
+          res.statusCode = 403;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: "You can only deactivate your own referral codes." }));
+          return;
+        }
+        if (Number(owned[0].active) === 0) {
+          res.statusCode = 200;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ success: true, code: trimmed }));
+          return;
+        }
+        await runExec("UPDATE referrals SET active = 0 WHERE code = ? AND customer_id = ?", [trimmed, customerId]);
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ success: true, code: trimmed }));
+        return;
+      }
+      // ── "activate" action: re-activate a deactivated code ──
+      if (action === "activate") {
+        const trimmed = String(code).trim().toUpperCase();
+        const owned = await runQuery("SELECT customer_id, active FROM referrals WHERE code = ?", [trimmed]);
+        if (owned.length === 0) {
+          res.statusCode = 404;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: "Referral code not found." }));
+          return;
+        }
+        if (owned[0].customer_id !== customerId) {
+          res.statusCode = 403;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: "You can only activate your own referral codes." }));
+          return;
+        }
+        if (Number(owned[0].active) !== 0) {
+          res.statusCode = 200;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ success: true, code: trimmed }));
+          return;
+        }
+        await runExec("UPDATE referrals SET active = 1 WHERE code = ? AND customer_id = ?", [trimmed, customerId]);
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ success: true, code: trimmed }));
         return;
       }
 
@@ -513,7 +602,8 @@ export default async function handler(req, res) {
           res.end(JSON.stringify({ valid: false }));
           return;
         }
-        const row = await runQuery("SELECT code FROM referrals WHERE code = ?", [lookupCode.toUpperCase()]);
+        await ensureActiveColumn();
+        const row = await runQuery("SELECT code FROM referrals WHERE code = ? AND active = 1", [lookupCode.toUpperCase()]);
         if (row.length > 0) {
           // Record click
           await runExec("INSERT INTO referral_clicks (code) VALUES (?)", [lookupCode.toUpperCase()]);
@@ -546,26 +636,42 @@ export default async function handler(req, res) {
       const tier = await getCustomerTier(customerId);
       const codeLimit = codeLimitForTier(tier);
 
+      await ensureActiveColumn();
       if (statsMode) {
         const rows = await ensureCode(customerId, tier);
+        const codeActive = {};
+        rows.forEach((r) => {
+          const c = r?.code || r?.["code"] || "";
+          if (c) codeActive[c] = Number(r?.active ?? r?.["active"] ?? 1) !== 0;
+        });
+        // Auto-generate a fresh code if the customer has none (or all are deactivated) and is eligible
+        if ((Object.keys(codeActive).length === 0 || Object.values(codeActive).every((a) => !a)) && codeLimit > 0) {
+          const gen = generateCode();
+          await runExec("INSERT OR IGNORE INTO referrals (code, customer_id) VALUES (?, ?)", [gen, customerId]);
+          codeActive[gen] = true;
+        }
+        // Primary = first ACTIVE code (deactivated codes never serve as the shareable ref)
+        const primaryCode = Object.keys(codeActive).find((c) => codeActive[c]) || Object.keys(codeActive)[0] || "";
         const codes = [];
         for (const row of rows) {
           const code = row?.code || row?.["code"] || "";
           if (code) codes.push(await buildCodeStats(code));
         }
+        // Include any auto-generated code in the per-code stats list too
+        if (codes.length === 0 && primaryCode) codes.push(await buildCodeStats(primaryCode));
         res.statusCode = 200;
         res.setHeader("content-type", "application/json");
-        res.end(JSON.stringify({ stats: { tier, codeLimit, codes } }));
+        res.end(JSON.stringify({ stats: { tier, codeLimit, code: primaryCode, codeActive, codes } }));
         return;
       }
 
       // Non-stats: return all codes (auto-create the first for eligible subscribers)
       const rows = await ensureCode(customerId, tier);
       const codes = rows
-        .map((r) => r?.code || r?.["code"] || "")
-        .filter(Boolean)
-        .map((code) => ({ code, link: linkForCode(code) }));
-      const first = codes[0];
+        .map((r) => ({ code: r?.code || r?.["code"] || "", active: Number(r?.active ?? r?.["active"] ?? 1) !== 0 }))
+        .filter((r) => r.code)
+        .map((r) => ({ code: r.code, link: linkForCode(r.code), active: r.active }));
+      const primary = codes.find((c) => c.active) || codes[0] || null;
       res.statusCode = 200;
       res.setHeader("content-type", "application/json");
       res.end(JSON.stringify({
@@ -573,8 +679,8 @@ export default async function handler(req, res) {
         tier,
         codeLimit,
         // Legacy single-code fields for backward compatibility
-        code: first?.code || "",
-        link: first?.link || "",
+        code: primary?.code || "",
+        link: primary?.link || "",
       }));
     } catch (e) {
       res.statusCode = 500;

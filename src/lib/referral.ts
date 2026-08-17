@@ -206,6 +206,7 @@ export interface ReferralCodesResult {
 
 export interface ReferralCodeStats {
   code: string;
+  active?: boolean;
   clicks: number;
   conversions: number;
   bountyEarnedCents: number;
@@ -218,6 +219,10 @@ export interface ReferralStatsResult {
   tier: TierName;
   codeLimit: number;
   codes: ReferralCodeStats[];
+  /** Primary (first ACTIVE) code — deactivated codes never serve as the shareable ref. */
+  code?: string;
+  /** Per-code active map. */
+  codeActive?: Record<string, boolean>;
 }
 
 export interface ReferralMutationResult {
@@ -349,6 +354,51 @@ export async function deleteReferralCode(
   const ok = await runExec("DELETE FROM referrals WHERE customer_id = ? AND code = ?", [customerId, trimmed]);
   return ok ? { success: true, code: trimmed } : { success: false, error: "Delete failed. Try again." };
 }
+/**
+ * Soft-deactivate a referral code. The code stops accepting new referrals
+ * (no clicks, no conversions) but is not deleted. Owner-scoped and idempotent.
+ */
+export async function deactivateReferralCode(
+  customerId: string,
+  code: string
+): Promise<ReferralMutationResult> {
+  if (!getTursoConfig()) return { success: false, error: "Referral system unavailable." };
+  const trimmed = String(code).trim().toUpperCase();
+  const owned = await runQuery("SELECT customer_id, active FROM referrals WHERE code = ?", [trimmed]);
+  if (owned.length === 0) {
+    return { success: false, error: "Referral code not found." };
+  }
+  if (owned[0].customer_id !== customerId) {
+    return { success: false, error: "You can only deactivate your own referral codes." };
+  }
+  if (Number(owned[0].active) === 0) {
+    return { success: true, code: trimmed }; // already inactive — idempotent
+  }
+  const ok = await runExec("UPDATE referrals SET active = 0 WHERE code = ? AND customer_id = ?", [trimmed, customerId]);
+  return ok ? { success: true, code: trimmed } : { success: false, error: "Deactivate failed. Try again." };
+}
+/**
+ * Re-activate a deactivated referral code. Owner-scoped and idempotent.
+ */
+export async function activateReferralCode(
+  customerId: string,
+  code: string
+): Promise<ReferralMutationResult> {
+  if (!getTursoConfig()) return { success: false, error: "Referral system unavailable." };
+  const trimmed = String(code).trim().toUpperCase();
+  const owned = await runQuery("SELECT customer_id, active FROM referrals WHERE code = ?", [trimmed]);
+  if (owned.length === 0) {
+    return { success: false, error: "Referral code not found." };
+  }
+  if (owned[0].customer_id !== customerId) {
+    return { success: false, error: "You can only activate your own referral codes." };
+  }
+  if (Number(owned[0].active) !== 0) {
+    return { success: true, code: trimmed }; // already active — idempotent
+  }
+  const ok = await runExec("UPDATE referrals SET active = 1 WHERE code = ? AND customer_id = ?", [trimmed, customerId]);
+  return ok ? { success: true, code: trimmed } : { success: false, error: "Activate failed. Try again." };
+}
 
 /**
  * Get per-code referral stats for a Stripe customer.
@@ -362,18 +412,26 @@ export async function getReferralStats(customerId: string): Promise<ReferralStat
   const codeLimit = codeLimitForTier(tier);
 
   let rows = await runQuery(
-    "SELECT code FROM referrals WHERE customer_id = ? ORDER BY id ASC",
+    "SELECT code, active FROM referrals WHERE customer_id = ? ORDER BY id ASC",
     [customerId]
   );
-  if (rows.length === 0 && codeLimit > 0) {
+  const codeActive: Record<string, boolean> = {};
+  rows.forEach((r) => {
+    const c = r?.code || r?.["code"] || "";
+    if (c) codeActive[c] = Number(r?.active ?? r?.["active"] ?? 1) !== 0;
+  });
+  const allInactive = Object.keys(codeActive).length > 0 && Object.values(codeActive).every((a) => !a);
+  if ((rows.length === 0 || allInactive) && codeLimit > 0) {
     const gen =
       "LNS-" +
       Math.random().toString(36).substring(2, 6).toUpperCase() +
       "-" +
       Math.random().toString(36).substring(2, 6).toUpperCase();
     await runExec("INSERT OR IGNORE INTO referrals (code, customer_id) VALUES (?, ?)", [gen, customerId]);
-    rows = [{ code: gen }];
+    rows = [{ code: gen, active: 1 }];
+    codeActive[gen] = true;
   }
+  const primaryCode = Object.keys(codeActive).find((c) => codeActive[c]) || Object.keys(codeActive)[0] || "";
 
   const codes: ReferralCodeStats[] = [];
   for (const row of rows) {
@@ -404,6 +462,7 @@ export async function getReferralStats(customerId: string): Promise<ReferralStat
 
     codes.push({
       code,
+      active: codeActive[code] !== false,
       clicks: clickCount,
       conversions: convCount,
       bountyEarnedCents: totalCents,
@@ -413,5 +472,5 @@ export async function getReferralStats(customerId: string): Promise<ReferralStat
     });
   }
 
-  return { tier, codeLimit, codes };
+  return { tier, codeLimit, code: primaryCode, codeActive, codes };
 }

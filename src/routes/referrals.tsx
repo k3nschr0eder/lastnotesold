@@ -4,6 +4,7 @@ import ReferralWidget from "~/components/ReferralWidget";
 
 interface CodeStat {
   code: string;
+  active: boolean;
   clicks: number;
   conversions: number;
   earned: number;
@@ -134,6 +135,7 @@ function ReferralsPage() {
         const s = data.stats;
         setCodes((s.codes || []).map((c: any) => ({
           code: c.code || "",
+          active: s.codeActive ? s.codeActive[c.code] !== false : true,
           clicks: c.clicks || 0,
           conversions: c.conversions || 0,
           earned: parseFloat(c.bountyEarnedDollars || "0"),
@@ -184,6 +186,45 @@ function ReferralsPage() {
     }
   };
 
+  const handleDeactivate = async (code: string) => {
+    if (!window.confirm(`Deactivate referral code "${code}"? It will stop accepting new referrals (clicks and conversions) until you re-activate it.`)) return;
+    setPageMessage(null);
+    try {
+      const r = await fetch("/api/referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId, code, action: "deactivate" }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        setPageMessage({ type: "success", text: `Code ${data.code} deactivated.` });
+        if (customerId) loadStats(customerId);
+      } else {
+        setPageMessage({ type: "error", text: data.error || "Failed to deactivate code." });
+      }
+    } catch {
+      setPageMessage({ type: "error", text: "Network error. Try again." });
+    }
+  };
+  const handleActivate = async (code: string) => {
+    setPageMessage(null);
+    try {
+      const r = await fetch("/api/referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId, code, action: "activate" }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        setPageMessage({ type: "success", text: `Code ${data.code} is active again.` });
+        if (customerId) loadStats(customerId);
+      } else {
+        setPageMessage({ type: "error", text: data.error || "Failed to re-activate code." });
+      }
+    } catch {
+      setPageMessage({ type: "error", text: "Network error. Try again." });
+    }
+  };
   const handleSaved = (newCode: string) => {
     setRenaming(null);
     setPageMessage({ type: "success", text: `Code ${newCode} saved.` });
@@ -264,6 +305,8 @@ function ReferralsPage() {
                 codeLimit={codeLimit}
                 onDelete={handleDelete}
                 onRename={(code) => setRenaming(code)}
+                onDeactivate={handleDeactivate}
+                onActivate={handleActivate}
               />
 
               {/* Rename form (when a card's Rename was clicked) */}
