@@ -145,8 +145,8 @@ export default async function handler(req, res) {
         return;
       }
       
-      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
-      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp", "price_1TwCvMExpuSFJTtEyAWio9zL"];
+      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O", "price_1TwCf6ExpuSFJTtEDxfhjh9K"];
       const priceId = item?.price?.id;
       let tier = "pro";
       if (PREMIER_PRICES.includes(priceId)) tier = "premier";
@@ -230,8 +230,8 @@ export default async function handler(req, res) {
 
       const item = sub.items?.data?.[0];
       const priceId = item?.price?.id;
-      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
-      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp", "price_1TwCvMExpuSFJTtEyAWio9zL"];
+      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O", "price_1TwCf6ExpuSFJTtEDxfhjh9K"];
       let tier;
       if (PREMIER_PRICES.includes(priceId)) {
         tier = "premier";
@@ -906,8 +906,8 @@ async function getBody(req) {
   });
 }
 
-var PREMIER_PRICES_ADMIN = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
-var PRO_PRICES_ADMIN = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+var PREMIER_PRICES_ADMIN = ["price_1TwOtyExpuSFJTtEmSxDgmmp", "price_1TwCvMExpuSFJTtEyAWio9zL"];
+var PRO_PRICES_ADMIN = ["price_1TwOtrExpuSFJTtEH7NTOh0O", "price_1TwCf6ExpuSFJTtEDxfhjh9K"];
 var LNS_PRICE_IDS_ADMIN = PREMIER_PRICES_ADMIN.concat(PRO_PRICES_ADMIN);
 
 async function handleSubscriptions(auth) {
