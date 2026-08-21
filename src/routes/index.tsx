@@ -127,6 +127,10 @@ function Home() {
   const [showSubscriberLogin, setShowSubscriberLogin] = useState(false);
   const [subEmail, setSubEmail] = useState("");
   const [subLoading, setSubLoading] = useState(false);
+  // Cross-tool bundle activation (buy-one-get-both) — email ownership-confirmed
+  const [activateEmail, setActivateEmail] = useState("");
+  const [activating, setActivating] = useState(false);
+  const [activateMsg, setActivateMsg] = useState<string | null>(null);
   const [tier, setTier] = useState<TierName>("free");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
@@ -208,6 +212,30 @@ function Home() {
     }
   };
 
+  const handleActivate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activateEmail) return;
+    setActivating(true);
+    setActivateMsg(null);
+    try {
+      // Email ownership-confirmed activation: posting only sends a verification
+      // link to the inbox (if an eligible subscription exists). We never set the
+      // cookie on bare email — the user must first confirm via the emailed link.
+      await fetch("/api/activate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: activateEmail }),
+      });
+      setActivateMsg(
+        "If an eligible subscription matches that email, we've sent an activation link — check your inbox and click it to confirm this email and unlock access here."
+      );
+    } catch (err) {
+      console.error(err);
+      setActivateMsg("Something went wrong. Please try again in a moment.");
+    } finally {
+      setActivating(false);
+    }
+  };
   const handleSearch = async (query: string) => {
     setIsLoading(true);
     setHasSearched(true);
@@ -291,6 +319,33 @@ function Home() {
                 )}
               </div>
             )}
+            {/* Cross-tool bundle — buy-one-get-both. Activate a LastSoldCoin sub here. */}
+            <div className="mt-4 text-center">
+              <details className="inline-block text-center">
+                <summary className="text-xs text-gray-500 hover:text-gray-300 cursor-pointer inline-block">
+                  Already subscribed on LastSoldCoin? Activate it here on LastNoteSold
+                </summary>
+                <div className="mt-3">
+                  <form onSubmit={handleActivate} className="flex items-center justify-center gap-2">
+                    <input
+                      type="email"
+                      placeholder="Your subscription email"
+                      value={activateEmail}
+                      onChange={(e) => setActivateEmail(e.target.value)}
+                      className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:border-emerald-500 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={activating}
+                      className="rounded-lg border border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      {activating ? "..." : "Send activation link"}
+                    </button>
+                  </form>
+                  {activateMsg && <p className="mt-2 text-xs text-green-400/90">{activateMsg}</p>}
+                </div>
+              </details>
+            </div>
             {customerId && (
               <div className="mt-1 flex items-center justify-center gap-3">
                 <TierBadge tier={tier} />
