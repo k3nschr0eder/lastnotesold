@@ -1289,7 +1289,7 @@ JSON
 # Create activate API handler — cross-tool bundle activation (email ownership-confirmed)
 mkdir -p .vercel/output/functions/activate.func
 cat > .vercel/output/functions/activate.func/index.mjs << 'ACTEND'
-const crypto = require("crypto");
+import crypto from "node:crypto";
 const SK = process.env.STRIPE_SECRET_KEY || "";
 const AUTH = "Basic " + Buffer.from(SK + ":").toString("base64");
 const PREMIER_PRICES = ["price_1TwCvMExpuSFJTtEyAWio9zL", "price_1TwOtyExpuSFJTtEmSxDgmmp"];
