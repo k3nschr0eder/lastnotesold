@@ -145,8 +145,8 @@ export default async function handler(req, res) {
         return;
       }
       
-      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
-      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp", "price_1TwCvMExpuSFJTtEyAWio9zL"];
+      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O", "price_1TwCf6ExpuSFJTtEDxfhjh9K"];
       const priceId = item?.price?.id;
       let tier = "pro";
       if (PREMIER_PRICES.includes(priceId)) tier = "premier";
@@ -230,8 +230,8 @@ export default async function handler(req, res) {
 
       const item = sub.items?.data?.[0];
       const priceId = item?.price?.id;
-      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
-      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+      const PREMIER_PRICES = ["price_1TwOtyExpuSFJTtEmSxDgmmp", "price_1TwCvMExpuSFJTtEyAWio9zL"];
+      const PRO_PRICES = ["price_1TwOtrExpuSFJTtEH7NTOh0O", "price_1TwCf6ExpuSFJTtEDxfhjh9K"];
       let tier;
       if (PREMIER_PRICES.includes(priceId)) {
         tier = "premier";
@@ -906,8 +906,8 @@ async function getBody(req) {
   });
 }
 
-var PREMIER_PRICES_ADMIN = ["price_1TwOtyExpuSFJTtEmSxDgmmp"];
-var PRO_PRICES_ADMIN = ["price_1TwOtrExpuSFJTtEH7NTOh0O"];
+var PREMIER_PRICES_ADMIN = ["price_1TwOtyExpuSFJTtEmSxDgmmp", "price_1TwCvMExpuSFJTtEyAWio9zL"];
+var PRO_PRICES_ADMIN = ["price_1TwOtrExpuSFJTtEH7NTOh0O", "price_1TwCf6ExpuSFJTtEDxfhjh9K"];
 var LNS_PRICE_IDS_ADMIN = PREMIER_PRICES_ADMIN.concat(PRO_PRICES_ADMIN);
 
 async function handleSubscriptions(auth) {
@@ -1286,6 +1286,98 @@ cat > .vercel/output/functions/admin.func/.vc-config.json << 'JSON'
 { "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
 JSON
 
+# Create activate API handler — cross-tool bundle activation (email ownership-confirmed)
+mkdir -p .vercel/output/functions/activate.func
+cat > .vercel/output/functions/activate.func/index.mjs << 'ACTEND'
+const crypto = require("crypto");
+const SK = process.env.STRIPE_SECRET_KEY || "";
+const AUTH = "Basic " + Buffer.from(SK + ":").toString("base64");
+const PREMIER_PRICES = ["price_1TwCvMExpuSFJTtEyAWio9zL", "price_1TwOtyExpuSFJTtEmSxDgmmp"];
+const PRO_PRICES = ["price_1TwCf6ExpuSFJTtEDxfhjh9K", "price_1TwOtrExpuSFJTtEH7NTOh0O"];
+function readBody(req) { return new Promise((res, rej) => { const c = []; req.on("data", x => c.push(x)); req.on("end", () => res(Buffer.concat(c).toString("utf-8"))); req.on("error", rej); }); }
+function sign(customerId, tier, email, exp) {
+  const payload = [customerId, tier, email, exp].join("|");
+  const sig = crypto.createHmac("sha256", SK).update(payload).digest("base64url");
+  return Buffer.from(payload).toString("base64url") + "." + sig;
+}
+function verify(token) {
+  try {
+    const parts = String(token || "").split(".");
+    if (parts.length !== 2) return null;
+    const payload = Buffer.from(parts[0], "base64url").toString("utf-8");
+    const sig = crypto.createHmac("sha256", SK).update(payload).digest("base64url");
+    if (sig !== parts[1]) return null;
+    const [customerId, tier, email, exp] = payload.split("|");
+    if (!customerId || Date.now() > Number(exp)) return null;
+    return { customerId, tier, email };
+  } catch (e) { return null; }
+}
+async function findEligible(email) {
+  const res = await fetch("https://api.stripe.com/v1/customers/search?query=email:'" + encodeURIComponent(email) + "'&limit=10", { headers: { Authorization: AUTH } });
+  const data = await res.json();
+  const customers = (data && data.data) || [];
+  for (const cust of customers) {
+    const sr = await fetch("https://api.stripe.com/v1/subscriptions?customer=" + cust.id + "&status=active&limit=1", { headers: { Authorization: AUTH } });
+    const sd = await sr.json();
+    const sub = sd.data && sd.data[0];
+    if (!sub) continue;
+    const priceId = sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].price && sub.items.data[0].price.id;
+    if (PREMIER_PRICES.indexOf(priceId) !== -1) return { customerId: cust.id, tier: "premier" };
+    if (PRO_PRICES.indexOf(priceId) !== -1) return { customerId: cust.id, tier: "pro" };
+  }
+  return null;
+}
+async function sendEmail(to, link, host) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) { console.log("[Activate] RESEND_API_KEY not set - would send link to " + to + " : " + link); return; }
+  const brand = String(host || "").indexOf("lastnotesold") !== -1 ? "LastNoteSold" : "LastSoldCoin";
+  await fetch("https://api.resend.com/emails", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+    body: JSON.stringify({ from: "LastSoldCoin <admin@lastsoldcoin.com>", to: [to],
+      subject: "Confirm your " + brand + " access",
+      text: "You asked to activate your " + brand + " access using the cross-tool bundle. Click the link below to confirm you own this email and unlock your tier:\n\n" + link + "\n\nThis link expires in 30 minutes. If you didn't request this, you can ignore this email." }) });
+}
+function page(title, msg, tier) {
+  const tierLine = tier ? "<p style='margin:12px 0;color:#3b82f6;font-weight:600'>Your " + tier.charAt(0).toUpperCase() + tier.slice(1) + " tier is now active on this site.</p>" : "";
+  return "<!doctype html><html><body style='font-family:-apple-system,sans-serif;background:#0b1020;color:#e5e7eb;max-width:520px;margin:60px auto;padding:0 20px'><div style='background:#111a33;border:1px solid #24314d;border-radius:12px;padding:32px'><h1 style='font-size:20px;margin:0 0 8px'>" + title + "</h1>" + tierLine + "<p style='line-height:1.5;color:#cbd5e1'>" + msg + "</p><a href='" + (tier ? "/" : "/activate") + "' style='display:inline-block;margin-top:16px;padding:10px 18px;background:#3b82f6;color:#fff;border-radius:8px;text-decoration:none'>" + (tier ? "Return to the site" : "Back") + "</a></div></body></html>";
+}
+export default async function handler(req, res) {
+  const url = req.url || "";
+  const host = req.headers.host || "";
+  if (url.indexOf("/api/activate/confirm") !== -1) {
+    const params = new URL(url, "http://localhost").searchParams;
+    const info = verify(params.get("t") || "");
+    if (!info) { res.statusCode = 400; res.setHeader("content-type", "text/html; charset=utf-8"); res.end(page("Activation link invalid", "This link is invalid or has expired. Please go back to the site and request a new activation link.")); return; }
+    res.statusCode = 200;
+    res.setHeader("content-type", "text/html; charset=utf-8");
+    res.setHeader("Set-Cookie", "cus_id=" + info.customerId + "; Path=/; Max-Age=31536000; SameSite=Lax");
+    res.end(page("You're activated!", "Thanks for confirming. You can now use this site with the tier you already pay for on either LastSoldCoin or LastNoteSold.", info.tier));
+    return;
+  }
+  if (url.indexOf("/api/activate") !== -1 && req.method === "POST") {
+    let body = {};
+    try { body = JSON.parse((await readBody(req)) || "{}"); } catch (e) {}
+    const email = String(body.email || "").trim().toLowerCase();
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      const eligible = await findEligible(email);
+      if (eligible) {
+        const exp = Date.now() + 30 * 60 * 1000;
+        const proto = req.headers["x-forwarded-proto"] || "https";
+        const token = sign(eligible.customerId, eligible.tier, email, exp);
+        const link = proto + "://" + host + "/api/activate/confirm?t=" + encodeURIComponent(token);
+        try { await sendEmail(email, link, host); } catch (e) { console.error("[Activate] email failed", e); }
+      }
+    }
+    res.statusCode = 200; res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ status: "sent" }));
+    return;
+  }
+  res.statusCode = 404; res.end("not found");
+}
+ACTEND
+cat > .vercel/output/functions/activate.func/.vc-config.json << 'JSON'
+{ "runtime": "nodejs22.x", "handler": "index.mjs", "launcherType": "Nodejs" }
+JSON
+
 cat > .vercel/output/config.json <<'JSON'
 { "version": 3, "routes": [
   { "src": "/api/webhook", "dest": "/webhook" },
@@ -1301,6 +1393,8 @@ cat > .vercel/output/config.json <<'JSON'
   { "src": "/api/stream/events", "dest": "/stream-events" },
   { "src": "/api/admin/(.*)", "dest": "/admin" },
   { "src": "^/(?!referrals$|support$|privacy$|terms-of-service$|pricing$|about$|blog$|dashboard$|overlays$|admin$)([A-Za-z0-9][A-Za-z0-9-]{1,18}[A-Za-z0-9])$", "dest": "/redirect?code=$1" },
+  { "src": "/api/activate", "dest": "/activate" },
+  { "src": "/api/activate/confirm", "dest": "/activate" },
   { "handle": "filesystem" },
   { "src": "/(.*)", "dest": "/render" }
 ] }

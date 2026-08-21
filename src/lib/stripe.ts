@@ -19,11 +19,14 @@ export const PRICES = {
   PREMIER_MONTHLY: "price_1TwOtyExpuSFJTtEmSxDgmmp",
 } as const;
 
-/** All LastNoteSold price IDs for tier detection */
-export const ALL_PRICE_IDS = {
-  PRO: ["price_1TwOtrExpuSFJTtEH7NTOh0O"],
-  PREMIER: ["price_1TwOtyExpuSFJTtEmSxDgmmp"],
-} as const;
+/** All recognized price IDs for tier detection (own + sibling LastSoldCoin) */
+export const ALL_PRICE_IDS: {
+  PRO: string[];
+  PREMIER: string[];
+} = {
+  PRO: ["price_1TwOtrExpuSFJTtEH7NTOh0O", "price_1TwCf6ExpuSFJTtEDxfhjh9K"],
+  PREMIER: ["price_1TwOtyExpuSFJTtEmSxDgmmp", "price_1TwCvMExpuSFJTtEyAWio9zL"],
+};
 
 /**
  * Create a Stripe Checkout session for subscribing.
