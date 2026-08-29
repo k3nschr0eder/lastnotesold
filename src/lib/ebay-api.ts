@@ -5,6 +5,7 @@
  * OAuth2 client_credentials flow with production keys.
  */
 import { Buffer } from "node:buffer";
+import { buildSoldCompsQuery, filterSoldCompsItems } from "~/lib/soldcomps-keyword";
 
 // NOTE: This client ID is shared with the LastCoinSold eBay developer app registration.
 // A separate eBay developer app may be needed for LastNoteSold in the future.
@@ -178,8 +179,11 @@ export interface EbayItem {
 export async function searchEbayCompleted(query: string): Promise<EbayItem[]> {
   try {
     const token = await getToken();
-    const url = `${BROWSE_API}?q=${encodeURIComponent(query)}&limit=10`;
-    
+    // Build a disciplined banknote keyword (LNS PR junk fix, port of LCS #196)
+    // so loose free-text like "1928 $20 note" does not match coins/toy money.
+    const spec = buildSoldCompsQuery(query);
+    const url = `${BROWSE_API}?q=${encodeURIComponent(spec.keyword)}&limit=10`;
+
     const resp = await fetch(url, {
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -195,7 +199,7 @@ export async function searchEbayCompleted(query: string): Promise<EbayItem[]> {
     const data = await resp.json() as { itemSummaries?: any[] };
     const items = data.itemSummaries || [];
 
-    return items.map((item: any) => ({
+    const mapped: EbayItem[] = items.map((item: any) => ({
       itemId: String(item.itemId || ""),
       title: String(item.title || ""),
       price: parseFloat(item.price?.value || "0"),
@@ -205,6 +209,14 @@ export async function searchEbayCompleted(query: string): Promise<EbayItem[]> {
       galleryUrl: item.image?.imageUrl || "",
       sellingState: String(item.sellingState || ""),
     }));
+
+    // Post-filter: reject non-banknote junk + conflicting note type/denomination
+    // at the source. filterEbayResults (called in api.ts) still strips bulk lots.
+    const kept = filterSoldCompsItems(mapped, spec);
+    if (kept.length < mapped.length) {
+      console.log(`[eBay] keyword "${spec.keyword}" returned ${mapped.length}; kept ${kept.length} banknote items`);
+    }
+    return kept;
   } catch (e) {
     console.error("eBay fetch error:", e);
     return [];
