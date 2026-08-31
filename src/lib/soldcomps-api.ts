@@ -39,6 +39,8 @@ interface SoldCompsResponse {
 
 // ─── Configuration ──────────────────────────────────────────────────────
 
+import { buildSoldCompsQuery, filterSoldCompsItems } from "~/lib/soldcomps-keyword";
+
 const API_BASE = "https://api.sold-comps.com/v1";
 
 function getApiToken(): string {
@@ -64,10 +66,12 @@ export async function searchSoldComps(
     console.error("[SoldComps] SOLDCOMPS_API_TOKEN not configured — cannot fetch sold data");
     return [];
   }
-  console.log(`[SoldComps] Starting fetch for "${query}" (token present: ${token.length} chars)`);
+  // Build a disciplined banknote keyword + post-filter (LNS PR junk fix, port of LCS #196).
+  const spec = buildSoldCompsQuery(query);
+  console.log(`[SoldComps] Starting fetch for "${query}" (keyword: "${spec.keyword}", token present: ${token.length} chars)`);
 
   const params = new URLSearchParams({
-    keyword: query,
+    keyword: spec.keyword,
     count: String(Math.min(count, 240)),
   });
 
@@ -94,8 +98,11 @@ export async function searchSoldComps(
     }
 
     const data: SoldCompsResponse = await resp.json();
-    console.log(`[SoldComps] Found ${data.items.length} sold listings for "${query}" in ${elapsed}ms`);
-    return data.items;
+    // Post-filter the raw sold-comps items: reject non-banknote junk and
+    // conflicting note type/denomination so junk never reaches Sold Comps.
+    const kept = filterSoldCompsItems(data.items, spec);
+    console.log(`[SoldComps] Found ${data.items.length} sold listings for "${spec.keyword}" in ${elapsed}ms; kept ${kept.length} banknote comps`);
+    return kept;
   } catch (e) {
     const elapsed = Date.now() - startTime;
     const msg = e instanceof Error ? e.message : String(e);
